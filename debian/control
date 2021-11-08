@@ -1,0 +1,22 @@
+Source: eksctl
+Section: admin
+Priority: optional
+Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
+Build-Depends: debhelper-compat (= 13),
+	       golang-go (>= 1.17),
+	       dh-golang,
+	       mkdocs,
+	       dh-virtualenv,
+Standards-Version: 4.6.0
+Homepage: https://eksctl.io/
+Vcs-Browser: https://gitlab.com/kaisenlinux/packages/eksctl
+Vcs-Git: https://gitlab.com/kaisenlinux/packages/eksctl.git
+Rules-Requires-Root: no
+XS-Go-Import-Path: github.com/weaveworks/eksctl
+
+Package: eksctl
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends},
+	 ${misc:Depends},
+	 golang-go (>= 1.17)
+Description: The official CLI for Amazon EKS

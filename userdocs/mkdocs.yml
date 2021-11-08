@@ -1,0 +1,95 @@
+site_name: eksctl
+site_description: 'The official CLI for Amazon EKS'
+site_author: 'eksctl authors'
+repo_name: 'weaveworks/eksctl'
+repo_url: 'https://github.com/weaveworks/eksctl'
+docs_dir: src
+edit_uri: ""
+
+extra_css:
+    - extra.css
+    - usage/schema.css
+
+nav:
+    - Introduction: introduction.md
+    - Usage:
+        - Clusters:
+            - usage/creating-and-managing-clusters.md
+            - usage/unowned-clusters.md
+            - usage/eks-connector.md
+            - usage/customizing-the-kubelet.md
+            - usage/cloudwatch-cluster-logging.md
+            - usage/eks-private-cluster.md
+            - usage/addons.md
+            - usage/emr-access.md
+            - usage/fargate-support.md
+            - usage/cluster-upgrade.md
+            - usage/addon-upgrade.md
+        - Nodegroups:
+            - usage/managing-nodegroups.md
+            - usage/nodegroup-upgrade.md
+            - usage/nodegroup-with-custom-subnet.md
+            - usage/eks-managed-nodes.md
+            - usage/launch-template-support.md
+            - usage/instance-selector.md
+            - usage/spot-instances.md
+            - usage/gpu-support.md
+            - usage/arm-support.md
+            - usage/autoscaling.md
+            - usage/custom-ami-support.md
+            - usage/container-runtime.md
+            - usage/windows-worker-nodes.md
+        - GitOps:
+            - usage/gitops-v2.md
+            - usage/gitops-v1.md
+        - Security:
+            - usage/security.md
+            - usage/kms-encryption.md
+        - Networking:
+            - usage/vpc-networking.md
+        - IAM:
+            - usage/minimum-iam-policies.md
+            - usage/iam-permissions-boundary.md
+            - usage/iam-policies.md
+            - usage/iam-identity-mappings.md
+            - usage/iamserviceaccounts.md
+        - usage/dry-run.md
+        - usage/schema.md
+        - usage/eksctl-anywhere.md
+        - usage/troubleshooting.md
+        - FAQ: usage/faq.md
+    - Examples: "https://github.com/weaveworks/eksctl/tree/main/examples"
+    - Community: community.md
+
+extra:
+    social:
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/weaveworks
+
+theme:
+    name: 'material'
+    custom_dir: 'theme'
+    favicon: 'assets/images/favicon.png'
+    logo: 'assets/images/logo.png'
+    font:
+        text: 'Montserrat'
+        code: 'Roboto Mono'
+    palette:
+      primary: 'white'
+      accent: 'light blue'
+      scheme: preference
+    highlightjs: true
+    hljs_languages:
+        - yaml
+        - json
+        - bash
+
+markdown_extensions:
+    - toc:
+        permalink: true
+    - admonition
+    - codehilite:
+        linenums: true
+    - pymdownx.superfences
+    - pymdownx.tasklist:
+        custom_checkbox: true

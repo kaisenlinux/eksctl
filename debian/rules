@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+export GOPATH=$(CURDIR)/obj-x86_64-linux-gnu
+
+%:
+	dh $@ --buildsystem=golang
+
+override_dh_auto_build:
+	make binary
+	#Create bash completion
+	mkdir completions
+	./eksctl completion bash > completions/eksctl
+	# Create zsh completion
+	./eksctl completion zsh > completions/_eksctl
+
+override_dh_auto_test:
+
+override_dh_auto_install:
+	dh_auto_install -- --no-source
