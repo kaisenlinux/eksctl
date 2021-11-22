@@ -1,3 +1,9 @@
+eksctl (0.74.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import 0.74.0 version
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Mon, 22 Nov 2021 12:49:08 +0200
+
 eksctl (0.73.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import 0.73.0 version
