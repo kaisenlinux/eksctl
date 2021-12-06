@@ -487,11 +487,10 @@
         },
         "version": {
           "type": "string",
-          "description": "Valid variants are: `\"1.17\"`, `\"1.18\"`, `\"1.19\"`, `\"1.20\"`, `\"1.21\"` (default).",
-          "x-intellij-html-description": "Valid variants are: <code>&quot;1.17&quot;</code>, <code>&quot;1.18&quot;</code>, <code>&quot;1.19&quot;</code>, <code>&quot;1.20&quot;</code>, <code>&quot;1.21&quot;</code> (default).",
+          "description": "Valid variants are: `\"1.18\"`, `\"1.19\"`, `\"1.20\"`, `\"1.21\"` (default).",
+          "x-intellij-html-description": "Valid variants are: <code>&quot;1.18&quot;</code>, <code>&quot;1.19&quot;</code>, <code>&quot;1.20&quot;</code>, <code>&quot;1.21&quot;</code> (default).",
           "default": "1.21",
           "enum": [
-            "1.17",
             "1.18",
             "1.19",
             "1.20",
@@ -1519,11 +1518,18 @@
     },
     "NodeGroupIAM": {
       "properties": {
+        "attachPolicy": {
+          "$ref": "#/definitions/InlineDocument",
+          "description": "holds a policy document to attach",
+          "x-intellij-html-description": "holds a policy document to attach"
+        },
         "attachPolicyARNs": {
           "items": {
             "type": "string"
           },
-          "type": "array"
+          "type": "array",
+          "description": "list of ARNs of the IAM policies to attach",
+          "x-intellij-html-description": "list of ARNs of the IAM policies to attach"
         },
         "instanceProfileARN": {
           "type": "string"
@@ -1542,6 +1548,7 @@
         }
       },
       "preferredOrder": [
+        "attachPolicy",
         "attachPolicyARNs",
         "instanceProfileARN",
         "instanceRoleARN",
@@ -1947,10 +1954,17 @@
           "description": "enables creation of a fully-private cluster",
           "x-intellij-html-description": "enables creation of a fully-private cluster",
           "default": "false"
+        },
+        "skipEndpointCreation": {
+          "type": "boolean",
+          "description": "skips the creation process for endpoints completely. This is only used in case of an already provided VPC and if the user decided to set it to true.",
+          "x-intellij-html-description": "skips the creation process for endpoints completely. This is only used in case of an already provided VPC and if the user decided to set it to true.",
+          "default": "false"
         }
       },
       "preferredOrder": [
         "enabled",
+        "skipEndpointCreation",
         "additionalEndpointServices"
       ],
       "additionalProperties": false,

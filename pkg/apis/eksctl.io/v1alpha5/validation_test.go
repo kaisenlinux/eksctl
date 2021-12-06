@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	api "github.com/weaveworks/eksctl/pkg/apis/eksctl.io/v1alpha5"
+	cft "github.com/weaveworks/eksctl/pkg/cfn/template"
 	"github.com/weaveworks/eksctl/pkg/utils/strings"
 )
 
@@ -228,6 +229,15 @@ var _ = Describe("ClusterConfig validation", func() {
 			ng0 := cfg.NewNodeGroup()
 			ng0.Name = "ng0"
 
+			ng0.IAM.AttachPolicy = cft.MakePolicyDocument(
+				cft.MapOfInterfaces{
+					"Effect": "Allow",
+					"Action": []string{
+						"s3:Get*",
+					},
+					"Resource": "*",
+				},
+			)
 			ng0.IAM.AttachPolicyARNs = []string{
 				"arn:aws:iam::aws:policy/Foo",
 				"arn:aws:iam::aws:policy/Bar",
@@ -306,6 +316,23 @@ var _ = Describe("ClusterConfig validation", func() {
 			err = api.ValidateNodeGroup(1, ng1)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("nodeGroups[1].iam.instanceRoleARN and nodeGroups[1].iam.instanceRoleName cannot be set at the same time"))
+		})
+
+		It("should not allow setting instanceRoleARN and attachPolicy", func() {
+			ng1.IAM.InstanceRoleARN = "r1"
+			ng1.IAM.AttachPolicy = cft.MakePolicyDocument(
+				cft.MapOfInterfaces{
+					"Effect": "Allow",
+					"Action": []string{
+						"s3:Get*",
+					},
+					"Resource": "*",
+				},
+			)
+
+			err = api.ValidateNodeGroup(1, ng1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("nodeGroups[1].iam.instanceRoleARN and nodeGroups[1].iam.attachPolicy cannot be set at the same time"))
 		})
 
 		It("should not allow setting instanceRoleARN and attachPolicyARNs", func() {
@@ -560,6 +587,65 @@ var _ = Describe("ClusterConfig validation", func() {
 			cfg.VPC.ClusterEndpoints = &api.ClusterEndpoints{PrivateAccess: api.Disabled(), PublicAccess: api.Disabled()}
 			err = cfg.ValidateClusterEndpointConfig()
 			Expect(err).To(BeIdenticalTo(api.ErrClusterEndpointNoAccess))
+		})
+	})
+
+	Describe("ValidatePrivateCluster", func() {
+		var (
+			cfg *api.ClusterConfig
+			vpc *api.ClusterVPC
+		)
+
+		BeforeEach(func() {
+			cfg = api.NewClusterConfig()
+			vpc = api.NewClusterVPC()
+			cfg.VPC = vpc
+			cfg.PrivateCluster = &api.PrivateCluster{
+				Enabled: true,
+			}
+		})
+		When("private cluster is enabled", func() {
+			It("validates the config", func() {
+				err := cfg.ValidatePrivateCluster()
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		When("vpc is provided but no private subnets", func() {
+			It("fails the validation", func() {
+				cfg.VPC.Subnets = &api.ClusterSubnets{}
+				cfg.VPC.ID = "id"
+				err := cfg.ValidatePrivateCluster()
+				Expect(err).To(MatchError(ContainSubstring("vpc.subnets.private must be specified in a fully-private cluster when a pre-existing VPC is supplied")))
+			})
+		})
+		When("additional endpoints are defined with skip endpoints", func() {
+			It("fails the validation", func() {
+				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudFormation}
+				cfg.PrivateCluster.SkipEndpointCreation = true
+				err := cfg.ValidatePrivateCluster()
+				Expect(err).To(MatchError(ContainSubstring("additionalEndpoints cannot be defined together with skipEndpointCreation set to true")))
+			})
+		})
+		When("additional endpoints are defined", func() {
+			It("validates the endpoint configuration", func() {
+				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudFormation}
+				err := cfg.ValidatePrivateCluster()
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+		When("additional endpoints are defined incorrectly", func() {
+			It("fails the endpoint validation", func() {
+				cfg.PrivateCluster.AdditionalEndpointServices = []string{"unknown"}
+				err := cfg.ValidatePrivateCluster()
+				Expect(err).To(MatchError(ContainSubstring("invalid value in privateCluster.additionalEndpointServices")))
+			})
+		})
+		When("private cluster is enabled with skip endpoints", func() {
+			It("does not fail the validation", func() {
+				cfg.PrivateCluster.SkipEndpointCreation = true
+				err := cfg.ValidatePrivateCluster()
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 	})
 
