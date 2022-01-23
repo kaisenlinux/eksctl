@@ -1,3 +1,10 @@
+eksctl (0.80.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import 0.80.0 version
+  * Remove dh-virtualenv as dependancy to build eksctl
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Sun, 23 Jan 2022 16:53:28 +0100
+
 eksctl (0.77.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import 0.77.0 version
