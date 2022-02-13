@@ -625,6 +625,21 @@ func (c ClusterConfig) IsFargateEnabled() bool {
 	return len(c.FargateProfiles) > 0
 }
 
+func (c ClusterConfig) HasNodes() bool {
+	for _, m := range c.ManagedNodeGroups {
+		if m.GetDesiredCapacity() > 0 {
+			return true
+		}
+	}
+
+	for _, n := range c.NodeGroups {
+		if n.GetDesiredCapacity() > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // ClusterProvider is the interface to AWS APIs
 type ClusterProvider interface {
 	CloudFormation() cloudformationiface.CloudFormationAPI
@@ -762,7 +777,7 @@ func NewClusterConfig() *ClusterConfig {
 		KubernetesNetworkConfig: &KubernetesNetworkConfig{
 			IPFamily: DefaultIPFamily,
 		},
-		VPC: NewClusterVPC(),
+		VPC: NewClusterVPC(false),
 		CloudWatch: &ClusterCloudWatch{
 			ClusterLogging: &ClusterCloudWatchLogging{},
 		},
@@ -773,15 +788,20 @@ func NewClusterConfig() *ClusterConfig {
 }
 
 // NewClusterVPC creates new VPC config for a cluster
-func NewClusterVPC() *ClusterVPC {
+func NewClusterVPC(ipv6Enabled bool) *ClusterVPC {
 	cidr := DefaultCIDR()
+
+	var nat *ClusterNAT
+	if !ipv6Enabled {
+		nat = DefaultClusterNAT()
+	}
 
 	return &ClusterVPC{
 		Network: Network{
 			CIDR: &cidr,
 		},
 		ManageSharedNodeSecurityGroupRules: Enabled(),
-		NAT:                                DefaultClusterNAT(),
+		NAT:                                nat,
 		AutoAllocateIPv6:                   Disabled(),
 		ClusterEndpoints:                   &ClusterEndpoints{},
 	}
@@ -802,6 +822,10 @@ func (c *ClusterConfig) AppendAvailabilityZone(newAZ string) {
 		}
 	}
 	c.AvailabilityZones = append(c.AvailabilityZones, newAZ)
+}
+
+func (c *ClusterConfig) IPv6Enabled() bool {
+	return c.KubernetesNetworkConfig != nil && c.KubernetesNetworkConfig.IPv6Enabled()
 }
 
 // SetClusterStatus populates ClusterStatus using *eks.Cluster.
@@ -978,6 +1002,13 @@ func (n *NodeGroup) NGTaints() []NodeGroupTaint {
 // BaseNodeGroup implements NodePool
 func (n *NodeGroup) BaseNodeGroup() *NodeGroupBase {
 	return n.NodeGroupBase
+}
+
+func (n *NodeGroup) GetDesiredCapacity() int {
+	if n.NodeGroupBase != nil {
+		return n.NodeGroupBase.GetDesiredCapacity()
+	}
+	return 0
 }
 
 // GitOps groups all configuration options related to enabling GitOps Toolkit on a
@@ -1187,6 +1218,29 @@ type NodePool interface {
 	NGTaints() []NodeGroupTaint
 }
 
+// VolumeMapping Additional Volume Configurations
+type VolumeMapping struct {
+	// +optional
+	// VolumeSize gigabytes
+	// Defaults to `80`
+	VolumeSize *int `json:"volumeSize,omitempty"`
+	// Valid variants are `VolumeType` constants
+	// +optional
+	VolumeType *string `json:"volumeType,omitempty"`
+	// +optional
+	VolumeName *string `json:"volumeName,omitempty"`
+	// +optional
+	VolumeEncrypted *bool `json:"volumeEncrypted,omitempty"`
+	// +optional
+	VolumeKmsKeyID *string `json:"volumeKmsKeyID,omitempty"`
+	// +optional
+	VolumeIOPS *int `json:"volumeIOPS,omitempty"`
+	// +optional
+	VolumeThroughput *int `json:"volumeThroughput,omitempty"`
+	// +optional
+	SnapshotID *string `json:"snapshotID,omitempty"`
+}
+
 // NodeGroupBase represents the base nodegroup config for self-managed and managed nodegroups
 type NodeGroupBase struct {
 	// +required
@@ -1267,6 +1321,10 @@ type NodeGroupBase struct {
 	VolumeIOPS *int `json:"volumeIOPS,omitempty"`
 	// +optional
 	VolumeThroughput *int `json:"volumeThroughput,omitempty"`
+
+	// Additional Volume Configurations
+	// +optional
+	AdditionalVolumes []*VolumeMapping `json:"additionalVolumes,omitempty"`
 
 	// PreBootstrapCommands are executed before bootstrapping instances to the
 	// cluster
@@ -1394,6 +1452,20 @@ type ManagedNodeGroup struct {
 	// Internal fields
 
 	Unowned bool `json:"-"`
+}
+
+func (n *NodeGroupBase) GetDesiredCapacity() int {
+	if n.ScalingConfig != nil && n.ScalingConfig.DesiredCapacity != nil {
+		return *n.ScalingConfig.DesiredCapacity
+	}
+	return 0
+}
+
+func (m *ManagedNodeGroup) GetDesiredCapacity() int {
+	if m.NodeGroupBase != nil {
+		return m.NodeGroupBase.GetDesiredCapacity()
+	}
+	return 0
 }
 
 func (m *ManagedNodeGroup) InstanceTypeList() []string {

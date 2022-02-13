@@ -15,13 +15,15 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/repo"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/weaveworks/eksctl/pkg/karpenter/providers"
 )
 
 // Options defines options for the Helm Installer.
 type Options struct {
-	Namespace string
+	Namespace        string
+	RESTClientGetter genericclioptions.RESTClientGetter
 }
 
 // Installer implement the HelmInstaller interface.
@@ -35,7 +37,7 @@ type Installer struct {
 func NewInstaller(opts Options) (*Installer, error) {
 	settings := cli.New()
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), opts.Namespace, "", logger.Debug); err != nil {
+	if err := actionConfig.Init(opts.RESTClientGetter, opts.Namespace, "", logger.Debug); err != nil {
 		return nil, fmt.Errorf("failed to initialize action config: %w", err)
 	}
 	return &Installer{
@@ -89,7 +91,7 @@ func (i *Installer) InstallChart(ctx context.Context, opts providers.InstallChar
 	client.ReleaseName = opts.ReleaseName
 	client.Version = opts.Version
 	client.CreateNamespace = opts.CreateNamespace
-	client.Timeout = 30 * time.Second
+	client.Timeout = 10 * time.Minute
 
 	chartPath, err := client.ChartPathOptions.LocateChart(opts.ChartName, i.Settings)
 	if err != nil {
