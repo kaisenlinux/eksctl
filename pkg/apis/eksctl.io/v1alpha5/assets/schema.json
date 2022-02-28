@@ -851,6 +851,11 @@
           "description": "create a service account or not.",
           "x-intellij-html-description": "create a service account or not."
         },
+        "defaultInstanceProfile": {
+          "type": "string",
+          "description": "override the default IAM instance profile",
+          "x-intellij-html-description": "override the default IAM instance profile"
+        },
         "version": {
           "type": "string",
           "description": "defines the Karpenter version to install",
@@ -859,7 +864,8 @@
       },
       "preferredOrder": [
         "version",
-        "createServiceAccount"
+        "createServiceAccount",
+        "defaultInstanceProfile"
       ],
       "additionalProperties": false,
       "description": "provides configuration opti",
@@ -1313,6 +1319,11 @@
         "desiredCapacity": {
           "type": "integer"
         },
+        "disableASGTagPropagation": {
+          "type": "boolean",
+          "description": "disable the tag propagation in case desired capacity is 0.",
+          "x-intellij-html-description": "disable the tag propagation in case desired capacity is 0."
+        },
         "disableIMDSv1": {
           "type": "boolean",
           "description": "requires requests to the metadata service to use IMDSv2 tokens",
@@ -1371,6 +1382,11 @@
           },
           "type": "object",
           "default": "{}"
+        },
+        "maxInstanceLifetime": {
+          "type": "integer",
+          "description": "defines the maximum amount of time in seconds an instance stays alive.",
+          "x-intellij-html-description": "defines the maximum amount of time in seconds an instance stays alive."
         },
         "maxPodsPerNode": {
           "type": "integer"
@@ -1533,11 +1549,13 @@
         "updateConfig",
         "clusterDNS",
         "kubeletExtraConfig",
-        "containerRuntime"
+        "containerRuntime",
+        "disableASGTagPropagation",
+        "maxInstanceLifetime"
       ],
       "additionalProperties": false,
-      "description": "holds configuration attributes that are specific to a nodegroup",
-      "x-intellij-html-description": "holds configuration attributes that are specific to a nodegroup"
+      "description": "holds configuration attributes that are specific to an unmanaged nodegroup",
+      "x-intellij-html-description": "holds configuration attributes that are specific to an unmanaged nodegroup"
     },
     "NodeGroupBottlerocket": {
       "properties": {
@@ -1622,6 +1640,9 @@
           "description": "enables IAM policy for cluster-autoscaler",
           "x-intellij-html-description": "enables IAM policy for cluster-autoscaler"
         },
+        "awsLoadBalancerController": {
+          "type": "boolean"
+        },
         "certManager": {
           "type": "boolean",
           "description": "enables the ability to add records to Route 53 in order to solve the DNS01 challenge. More information can be found [here](https://cert-manager.io/docs/configuration/acme/dns01/route53/#set-up-a-iam-role)",
@@ -1665,6 +1686,7 @@
         "ebs",
         "fsx",
         "efs",
+        "awsLoadBalancerController",
         "albIngress",
         "xRay",
         "cloudWatch"

@@ -3,35 +3,28 @@ package cluster_test
 import (
 	"time"
 
-	"github.com/weaveworks/eksctl/pkg/actions/nodegroup"
-	"github.com/weaveworks/eksctl/pkg/ctl/cmdutils"
-
-	"github.com/pkg/errors"
-
-	"github.com/weaveworks/eksctl/pkg/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
-
-	"github.com/aws/aws-sdk-go/service/cloudformation"
-	"github.com/weaveworks/eksctl/pkg/utils/strings"
-
-	"github.com/weaveworks/eksctl/pkg/utils/tasks"
-
-	"github.com/weaveworks/eksctl/pkg/cfn/manager"
-	"github.com/weaveworks/eksctl/pkg/cfn/manager/fakes"
-
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/cloudformation"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	awseks "github.com/aws/aws-sdk-go/service/eks"
 	. "github.com/onsi/ginkgo"
-	"github.com/stretchr/testify/mock"
-	"github.com/weaveworks/eksctl/pkg/actions/cluster"
-	"github.com/weaveworks/eksctl/pkg/testutils"
-
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/mock"
+	"k8s.io/client-go/kubernetes/fake"
 
+	"github.com/weaveworks/eksctl/pkg/actions/cluster"
+	"github.com/weaveworks/eksctl/pkg/actions/nodegroup"
 	api "github.com/weaveworks/eksctl/pkg/apis/eksctl.io/v1alpha5"
+	"github.com/weaveworks/eksctl/pkg/cfn/manager"
+	"github.com/weaveworks/eksctl/pkg/cfn/manager/fakes"
+	"github.com/weaveworks/eksctl/pkg/ctl/cmdutils"
 	"github.com/weaveworks/eksctl/pkg/eks"
+	"github.com/weaveworks/eksctl/pkg/kubernetes"
+	"github.com/weaveworks/eksctl/pkg/testutils"
 	"github.com/weaveworks/eksctl/pkg/testutils/mockprovider"
+	"github.com/weaveworks/eksctl/pkg/utils/strings"
+	"github.com/weaveworks/eksctl/pkg/utils/tasks"
 )
 
 type drainerMockUnowned struct {
@@ -122,7 +115,7 @@ var _ = Describe("Delete", func() {
 			p.MockEC2().On("DescribeSecurityGroupsWithContext", mock.Anything, mock.Anything).Return(&ec2.DescribeSecurityGroupsOutput{}, nil)
 
 			fakeStackManager.GetFargateStackReturns(&cloudformation.Stack{StackName: aws.String("fargate-role")}, nil)
-			fakeStackManager.DeleteStackByNameReturns(nil, nil)
+			fakeStackManager.DeleteStackBySpecReturns(nil, nil)
 
 			p.MockEKS().On("ListNodegroups", mock.Anything).Return(&awseks.ListNodegroupsOutput{
 				Nodegroups: aws.StringSlice([]string{"ng-1", "ng-2"}),
@@ -210,7 +203,7 @@ var _ = Describe("Delete", func() {
 				p.MockEC2().On("DescribeSecurityGroupsWithContext", mock.Anything, mock.Anything).Return(&ec2.DescribeSecurityGroupsOutput{}, nil)
 
 				fakeStackManager.GetFargateStackReturns(nil, nil)
-				fakeStackManager.DeleteStackByNameReturns(nil, nil)
+				fakeStackManager.DeleteStackBySpecReturns(nil, nil)
 
 				p.MockEKS().On("ListNodegroups", mock.Anything).Return(&awseks.ListNodegroupsOutput{
 					Nodegroups: aws.StringSlice([]string{"ng-1", "ng-2"}),
@@ -232,6 +225,14 @@ var _ = Describe("Delete", func() {
 				p.MockEKS().On("DeleteNodegroup", nil).Return(&awseks.DeleteNodegroupOutput{}, nil)
 
 				p.MockEKS().On("DeleteCluster", mock.Anything).Return(&awseks.DeleteClusterOutput{}, nil)
+				ctl.Status = &eks.ProviderStatus{
+					ClusterInfo: &eks.ClusterInfo{
+						Cluster: &awseks.Cluster{
+							Status:  aws.String(awseks.ClusterStatusActive),
+							Version: aws.String("1.21"),
+						},
+					},
+				}
 				c := cluster.NewUnownedCluster(cfg, ctl, fakeStackManager)
 				fakeClientSet := fake.NewSimpleClientset()
 
@@ -304,7 +305,7 @@ var _ = Describe("Delete", func() {
 				p.MockEC2().On("DescribeSecurityGroupsWithContext", mock.Anything, mock.Anything).Return(&ec2.DescribeSecurityGroupsOutput{}, nil)
 
 				fakeStackManager.GetFargateStackReturns(nil, nil)
-				fakeStackManager.DeleteStackByNameReturns(nil, nil)
+				fakeStackManager.DeleteStackBySpecReturns(nil, nil)
 
 				p.MockEKS().On("ListNodegroups", mock.Anything).Return(&awseks.ListNodegroupsOutput{
 					Nodegroups: aws.StringSlice([]string{"ng-1", "ng-2"}),
@@ -332,7 +333,14 @@ var _ = Describe("Delete", func() {
 				c.SetNewClientSet(func() (kubernetes.Interface, error) {
 					return fakeClientSet, nil
 				})
-
+				ctl.Status = &eks.ProviderStatus{
+					ClusterInfo: &eks.ClusterInfo{
+						Cluster: &awseks.Cluster{
+							Status:  aws.String(awseks.ClusterStatusActive),
+							Version: aws.String("1.21"),
+						},
+					},
+				}
 				mockedDrainInput := &nodegroup.DrainInput{
 					NodeGroups:     cmdutils.ToKubeNodeGroups(cfg),
 					MaxGracePeriod: ctl.Provider.WaitTimeout(),

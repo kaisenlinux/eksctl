@@ -824,6 +824,11 @@ func (in *Karpenter) DeepCopyInto(out *Karpenter) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.DefaultInstanceProfile != nil {
+		in, out := &in.DefaultInstanceProfile, &out.DefaultInstanceProfile
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
@@ -1008,6 +1013,16 @@ func (in *NodeGroup) DeepCopyInto(out *NodeGroup) {
 	if in.ContainerRuntime != nil {
 		in, out := &in.ContainerRuntime, &out.ContainerRuntime
 		*out = new(string)
+		**out = **in
+	}
+	if in.DisableASGTagPropagation != nil {
+		in, out := &in.DisableASGTagPropagation, &out.DisableASGTagPropagation
+		*out = new(bool)
+		**out = **in
+	}
+	if in.MaxInstanceLifetime != nil {
+		in, out := &in.MaxInstanceLifetime, &out.MaxInstanceLifetime
+		*out = new(int)
 		**out = **in
 	}
 	return
@@ -1282,6 +1297,11 @@ func (in *NodeGroupIAMAddonPolicies) DeepCopyInto(out *NodeGroupIAMAddonPolicies
 	}
 	if in.AWSLoadBalancerController != nil {
 		in, out := &in.AWSLoadBalancerController, &out.AWSLoadBalancerController
+		*out = new(bool)
+		**out = **in
+	}
+	if in.DeprecatedALBIngress != nil {
+		in, out := &in.DeprecatedALBIngress, &out.DeprecatedALBIngress
 		*out = new(bool)
 		**out = **in
 	}

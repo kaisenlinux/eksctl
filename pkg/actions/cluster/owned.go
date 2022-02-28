@@ -5,6 +5,7 @@ import (
 
 	"github.com/kris-nova/logger"
 	"github.com/pkg/errors"
+
 	"github.com/weaveworks/eksctl/pkg/actions/nodegroup"
 	api "github.com/weaveworks/eksctl/pkg/apis/eksctl.io/v1alpha5"
 	"github.com/weaveworks/eksctl/pkg/cfn/manager"
@@ -49,10 +50,6 @@ func (c *OwnedCluster) Upgrade(dryRun bool) error {
 		return err
 	}
 
-	if err := c.ctl.RefreshClusterStatus(c.cfg); err != nil {
-		return err
-	}
-
 	supportsManagedNodes, err := c.ctl.SupportsManagedNodes(c.cfg)
 	if err != nil {
 		return err
@@ -83,6 +80,12 @@ func (c *OwnedCluster) Delete(_ time.Duration, wait, force, disableNodegroupEvic
 		logger.Debug("failed to check if cluster is operable: %v", err)
 	}
 
+	// moving this here was fine because inside `NewTasksToDeleteClusterWithNodeGroups` we did it anyway.
+	allStacks, err := c.stackManager.ListNodeGroupStacks()
+	if err != nil {
+		return err
+	}
+
 	oidcSupported := true
 	if clusterOperable {
 		var err error
@@ -106,10 +109,6 @@ func (c *OwnedCluster) Delete(_ time.Duration, wait, force, disableNodegroupEvic
 			}
 			oidcSupported = false
 		}
-		allStacks, err := c.stackManager.ListNodeGroupStacks()
-		if err != nil {
-			return err
-		}
 
 		nodeGroupManager := c.newNodeGroupManager(c.cfg, c.ctl, clientSet)
 		if err := drainAllNodeGroups(c.cfg, c.ctl, clientSet, allStacks, disableNodegroupEviction, nodeGroupManager, attemptVpcCniDeletion); err != nil {
@@ -132,7 +131,7 @@ func (c *OwnedCluster) Delete(_ time.Duration, wait, force, disableNodegroupEvic
 	}
 
 	deleteOIDCProvider := clusterOperable && oidcSupported
-	tasks, err := c.stackManager.NewTasksToDeleteClusterWithNodeGroups(deleteOIDCProvider, oidc, kubernetes.NewCachedClientSet(clientSet), wait, func(errs chan error, _ string) error {
+	tasks, err := c.stackManager.NewTasksToDeleteClusterWithNodeGroups(c.clusterStack, allStacks, deleteOIDCProvider, oidc, kubernetes.NewCachedClientSet(clientSet), wait, func(errs chan error, _ string) error {
 		logger.Info("trying to cleanup dangling network interfaces")
 		if err := c.ctl.LoadClusterVPC(c.cfg, c.stackManager); err != nil {
 			return errors.Wrapf(err, "getting VPC configuration for cluster %q", c.cfg.Metadata.Name)
@@ -180,7 +179,7 @@ func (c *OwnedCluster) deleteKarpenterStackIfExists() error {
 
 	if stack != nil {
 		logger.Info("deleting karpenter stack")
-		return c.stackManager.DeleteStackByNameSync(*stack.StackName)
+		return c.stackManager.DeleteStackSync(stack)
 	}
 
 	return nil
