@@ -1,3 +1,4 @@
 eksctl usr/bin/
 completions/eksctl usr/share/bash-completion/completions/
 completions/_eksctl usr/share/zsh/vendor-completions/
+debian/eksctl.png usr/share/pixmaps
