@@ -1,23 +1,24 @@
 //go:build integration
-// +build integration
 
 package windows
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
+	. "github.com/onsi/gomega"
+
 	. "github.com/weaveworks/eksctl/integration/runner"
 	"github.com/weaveworks/eksctl/integration/tests"
 	"github.com/weaveworks/eksctl/integration/utilities/kube"
 	api "github.com/weaveworks/eksctl/pkg/apis/eksctl.io/v1alpha5"
 	"github.com/weaveworks/eksctl/pkg/testutils"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 func init() {
@@ -37,7 +38,7 @@ var _ = BeforeSuite(func() {
 
 var _ = Describe("(Integration) [Windows Nodegroups]", func() {
 
-	createCluster := func(withOIDC bool) {
+	createCluster := func(withOIDC bool, ami, containerRuntime string) {
 		By("creating a new cluster with Windows nodegroups")
 		clusterConfig := api.NewClusterConfig()
 		clusterConfig.Metadata.Name = params.NewClusterName("windows")
@@ -48,9 +49,11 @@ var _ = Describe("(Integration) [Windows Nodegroups]", func() {
 		clusterConfig.NodeGroups = []*api.NodeGroup{
 			{
 				NodeGroupBase: &api.NodeGroupBase{
-					Name:      "windows",
-					AMIFamily: api.NodeImageFamilyWindowsServer2019FullContainer,
+					Name:       "windows",
+					AMIFamily:  ami,
+					VolumeSize: aws.Int(120),
 				},
+				ContainerRuntime: &containerRuntime,
 			},
 		}
 		clusterConfig.ManagedNodeGroups = []*api.ManagedNodeGroup{
@@ -76,22 +79,23 @@ var _ = Describe("(Integration) [Windows Nodegroups]", func() {
 		Expect(cmd).To(RunSuccessfully())
 	}
 
-	runWindowsPod := func() {
+	runWindowsPod := func(workload string) {
 		By("scheduling a Windows pod")
 		kubeTest, err := kube.NewTest(params.KubeconfigPath)
 		Expect(err).NotTo(HaveOccurred())
 
-		d := kubeTest.CreateDeploymentFromFile("default", "../../data/windows-server-iis.yaml")
-		kubeTest.WaitForDeploymentReady(d, 12*time.Minute)
+		d := kubeTest.CreateDeploymentFromFile("default", fmt.Sprintf("../../data/%s", workload))
+		kubeTest.WaitForDeploymentReady(d, 30*time.Minute)
 	}
 
 	Context("When creating a cluster with Windows nodegroups", func() {
-		DescribeTable("it should be able to run Windows pods", func(withOIDC bool) {
-			createCluster(withOIDC)
-			runWindowsPod()
+		DescribeTable("it should be able to run Windows pods", func(withOIDC bool, ami, workload, containerRuntime string) {
+			createCluster(withOIDC, ami, containerRuntime)
+			runWindowsPod(workload)
 		},
-			Entry("when withOIDC is disabled", false),
-			Entry("when withOIDC is enabled", true),
+			Entry("windows when withOIDC is disabled", false, api.NodeImageFamilyWindowsServer2019FullContainer, "windows-server-iis.yaml", api.ContainerRuntimeDockerForWindows),
+			Entry("windows when withOIDC is enabled", true, api.NodeImageFamilyWindowsServer2019FullContainer, "windows-server-iis.yaml", api.ContainerRuntimeDockerForWindows),
+			Entry("windows 20H2", true, api.NodeImageFamilyWindowsServer20H2CoreContainer, "windows-server-iis-20H2.yaml", api.ContainerRuntimeContainerD),
 		)
 	})
 

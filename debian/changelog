@@ -1,3 +1,9 @@
+eksctl (0.95.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import 0.95.0 version
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Fri, 06 May 2022 00:16:33 +0100
+
 eksctl (0.89.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import 0.89.0 version

@@ -1,6 +1,7 @@
 package eks
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/kris-nova/logger"
 	"github.com/pkg/errors"
+
 	"github.com/weaveworks/eksctl/pkg/ami"
 	api "github.com/weaveworks/eksctl/pkg/apis/eksctl.io/v1alpha5"
 	"github.com/weaveworks/eksctl/pkg/cfn/manager"
@@ -35,13 +37,13 @@ type InstanceSelector interface {
 //counterfeiter:generate -o fakes/fake_nodegroup_initialiser.go . NodeGroupInitialiser
 // NodeGroupInitialiser is an interface that provides helpers for nodegroup creation.
 type NodeGroupInitialiser interface {
-	Normalize(nodePools []api.NodePool, clusterMeta *api.ClusterMeta) error
+	Normalize(ctx context.Context, nodePools []api.NodePool, clusterMeta *api.ClusterMeta) error
 	ExpandInstanceSelectorOptions(nodePools []api.NodePool, clusterAZs []string) error
 	NewAWSSelectorSession(provider api.ClusterProvider)
-	ValidateLegacySubnetsForNodeGroups(spec *api.ClusterConfig, provider api.ClusterProvider) error
-	DoesAWSNodeUseIRSA(provider api.ClusterProvider, clientSet kubernetes.Interface) (bool, error)
+	ValidateLegacySubnetsForNodeGroups(ctx context.Context, spec *api.ClusterConfig, provider api.ClusterProvider) error
+	DoesAWSNodeUseIRSA(ctx context.Context, provider api.ClusterProvider, clientSet kubernetes.Interface) (bool, error)
 	DoAllNodegroupStackTasks(taskTree *tasks.TaskTree, region, name string) error
-	ValidateExistingNodeGroupsForCompatibility(cfg *api.ClusterConfig, stackManager manager.StackManager) error
+	ValidateExistingNodeGroupsForCompatibility(ctx context.Context, cfg *api.ClusterConfig, stackManager manager.StackManager) error
 }
 
 // A NodeGroupService provides helpers for nodegroup creation
@@ -66,28 +68,22 @@ func (m *NodeGroupService) NewAWSSelectorSession(provider api.ClusterProvider) {
 }
 
 // Normalize normalizes nodegroups
-func (m *NodeGroupService) Normalize(nodePools []api.NodePool, clusterMeta *api.ClusterMeta) error {
+func (m *NodeGroupService) Normalize(ctx context.Context, nodePools []api.NodePool, clusterMeta *api.ClusterMeta) error {
 	for _, np := range nodePools {
 		switch ng := np.(type) {
 		case *api.ManagedNodeGroup:
 			hasNativeAMIFamilySupport := ng.AMIFamily == api.NodeImageFamilyAmazonLinux2 || ng.AMIFamily == api.NodeImageFamilyBottlerocket
 			if !hasNativeAMIFamilySupport && !api.IsAMI(ng.AMI) {
-				if err := ResolveAMI(m.Provider, clusterMeta.Version, np); err != nil {
+				if err := ResolveAMI(ctx, m.Provider, clusterMeta.Version, np); err != nil {
 					return err
 				}
 			}
 
 		case *api.NodeGroup:
 			if !api.IsAMI(ng.AMI) {
-				if err := ResolveAMI(m.Provider, clusterMeta.Version, ng); err != nil {
+				if err := ResolveAMI(ctx, m.Provider, clusterMeta.Version, ng); err != nil {
 					return err
 				}
-			} else {
-				// TODO remove
-				// This is a temporary hack to go down a legacy bootstrap codepath for Ubuntu
-				// and AL2 images
-				logger.Warning("Custom AMI detected for nodegroup %s. Please refer to https://github.com/weaveworks/eksctl/issues/3563 for upcoming breaking changes", ng.Name)
-				ng.CustomAMI = true
 			}
 		}
 
@@ -96,7 +92,7 @@ func (m *NodeGroupService) Normalize(nodePools []api.NodePool, clusterMeta *api.
 		logger.Info("nodegroup %q will use %q [%s/%s]", ng.Name, ng.AMI, ng.AMIFamily, clusterMeta.Version)
 
 		if ng.AMI != "" {
-			if err := ami.Use(m.Provider.EC2(), ng); err != nil {
+			if err := ami.Use(ctx, m.Provider.EC2(), ng); err != nil {
 				return err
 			}
 		}
@@ -104,7 +100,7 @@ func (m *NodeGroupService) Normalize(nodePools []api.NodePool, clusterMeta *api.
 		// fingerprint, so if unique keys are provided, each will get
 		// loaded and used as intended and there is no need to have
 		// nodegroup name in the key name
-		publicKeyName, err := ssh.LoadKey(ng.SSH, clusterMeta.Name, ng.Name, m.Provider.EC2())
+		publicKeyName, err := ssh.LoadKey(ctx, ng.SSH, clusterMeta.Name, ng.Name, m.Provider.EC2())
 		if err != nil {
 			return err
 		}
@@ -218,8 +214,8 @@ func (m *NodeGroupService) expandInstanceSelector(ins *api.InstanceSelector, azs
 	return instanceTypes, nil
 }
 
-func (m *NodeGroupService) ValidateLegacySubnetsForNodeGroups(spec *api.ClusterConfig, provider api.ClusterProvider) error {
-	return vpc.ValidateLegacySubnetsForNodeGroups(spec, provider)
+func (m *NodeGroupService) ValidateLegacySubnetsForNodeGroups(ctx context.Context, spec *api.ClusterConfig, provider api.ClusterProvider) error {
+	return vpc.ValidateLegacySubnetsForNodeGroups(ctx, spec, provider)
 }
 
 // DoAllNodegroupStackTasks iterates over nodegroup tasks and returns any errors.
@@ -241,8 +237,8 @@ func (m *NodeGroupService) DoAllNodegroupStackTasks(taskTree *tasks.TaskTree, re
 
 // ValidateExistingNodeGroupsForCompatibility looks at each of the existing nodegroups and
 // validates configuration, if it find issues it logs messages
-func (m *NodeGroupService) ValidateExistingNodeGroupsForCompatibility(cfg *api.ClusterConfig, stackManager manager.StackManager) error {
-	infoByNodeGroup, err := stackManager.DescribeNodeGroupStacksAndResources()
+func (m *NodeGroupService) ValidateExistingNodeGroupsForCompatibility(ctx context.Context, cfg *api.ClusterConfig, stackManager manager.StackManager) error {
+	infoByNodeGroup, err := stackManager.DescribeNodeGroupStacksAndResources(ctx)
 	if err != nil {
 		return errors.Wrap(err, "getting resources for all nodegroup stacks")
 	}

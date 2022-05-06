@@ -3,7 +3,7 @@ package builder
 import (
 	"fmt"
 
-	cfn "github.com/aws/aws-sdk-go/service/cloudformation"
+	"github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	gfn "github.com/weaveworks/goformation/v4/cloudformation"
 	gfniam "github.com/weaveworks/goformation/v4/cloudformation/iam"
 	gfnt "github.com/weaveworks/goformation/v4/cloudformation/types"
@@ -95,6 +95,10 @@ func (k *KarpenterResourceSet) addResourcesForKarpenter() error {
 		ManagedPolicyArns:        gfnt.NewSlice(makePolicyARNs(managedPolicyNames.List()...)...),
 	}
 
+	if api.IsSetAndNonEmptyString(k.clusterSpec.IAM.ServiceRolePermissionsBoundary) {
+		role.PermissionsBoundary = gfnt.NewString(*k.clusterSpec.IAM.ServiceRolePermissionsBoundary)
+	}
+
 	roleRef := k.newResource(KarpenterNodeRoleName, &role)
 
 	instanceProfile := gfniam.InstanceProfile{
@@ -147,6 +151,6 @@ func (k *KarpenterResourceSet) WithNamedIAM() bool {
 }
 
 // GetAllOutputs collects all outputs of the nodegroup
-func (k *KarpenterResourceSet) GetAllOutputs(stack cfn.Stack) error {
+func (k *KarpenterResourceSet) GetAllOutputs(stack types.Stack) error {
 	return k.rs.GetAllOutputs(stack)
 }

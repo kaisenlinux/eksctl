@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
+	awsiam "github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/autoscaling"
-	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
-	awsiam "github.com/aws/aws-sdk-go/service/iam"
+
 	"github.com/kris-nova/logger"
 	"github.com/pkg/errors"
 
 	addons "github.com/weaveworks/eksctl/pkg/addons/default"
+	"github.com/weaveworks/eksctl/pkg/awsapi"
 	"github.com/weaveworks/eksctl/pkg/cfn/manager"
 	"github.com/weaveworks/eksctl/pkg/iam"
 	"github.com/weaveworks/eksctl/pkg/utils/tasks"
@@ -103,8 +104,8 @@ type KubeNodeGroup interface {
 }
 
 // GetNodeGroupIAM retrieves the IAM configuration of the given nodegroup
-func (c *ClusterProvider) GetNodeGroupIAM(stackManager manager.StackManager, ng *api.NodeGroup) error {
-	stacks, err := stackManager.DescribeNodeGroupStacks()
+func (c *ClusterProvider) GetNodeGroupIAM(ctx context.Context, stackManager manager.StackManager, ng *api.NodeGroup) error {
+	stacks, err := stackManager.DescribeNodeGroupStacks(ctx)
 	if err != nil {
 		return err
 	}
@@ -119,7 +120,7 @@ func (c *ClusterProvider) GetNodeGroupIAM(stackManager manager.StackManager, ng 
 			if err != nil {
 				return errors.Wrapf(
 					err, "couldn't get iam configuration for nodegroup %q (perhaps state %q is transitional)",
-					ng.Name, *s.StackStatus,
+					ng.Name, s.StackStatus,
 				)
 			}
 			return nil
@@ -143,7 +144,7 @@ func getAWSNodeSAARNAnnotation(clientSet kubernetes.Interface) (string, error) {
 }
 
 // DoesAWSNodeUseIRSA evaluates whether an aws-node uses IRSA
-func (n *NodeGroupService) DoesAWSNodeUseIRSA(provider api.ClusterProvider, clientSet kubernetes.Interface) (bool, error) {
+func (n *NodeGroupService) DoesAWSNodeUseIRSA(ctx context.Context, provider api.ClusterProvider, clientSet kubernetes.Interface) (bool, error) {
 	roleArn, err := getAWSNodeSAARNAnnotation(clientSet)
 	if err != nil {
 		return false, errors.Wrap(err, "error retrieving aws-node arn")
@@ -155,10 +156,10 @@ func (n *NodeGroupService) DoesAWSNodeUseIRSA(provider api.ClusterProvider, clie
 	if len(arnParts) <= 1 {
 		return false, errors.Errorf("invalid ARN %s", roleArn)
 	}
-	input := awsiam.ListAttachedRolePoliciesInput{
+	input := &awsiam.ListAttachedRolePoliciesInput{
 		RoleName: aws.String(arnParts[len(arnParts)-1]),
 	}
-	policies, err := provider.IAM().ListAttachedRolePolicies(&input)
+	policies, err := provider.IAM().ListAttachedRolePolicies(ctx, input)
 	if err != nil {
 		return false, errors.Wrap(err, "error listing attached policies")
 	}
@@ -172,7 +173,8 @@ func (n *NodeGroupService) DoesAWSNodeUseIRSA(provider api.ClusterProvider, clie
 }
 
 type suspendProcesses struct {
-	asg             autoscalingiface.AutoScalingAPI
+	asg             awsapi.ASG
+	ctx             context.Context
 	nodegroup       *api.NodeGroupBase
 	stackCollection manager.StackManager
 }
@@ -182,17 +184,17 @@ func (t *suspendProcesses) Describe() string {
 }
 
 func (t *suspendProcesses) Do() error {
-	ngStack, err := t.stackCollection.DescribeNodeGroupStack(t.nodegroup.Name)
+	ngStack, err := t.stackCollection.DescribeNodeGroupStack(context.TODO(), t.nodegroup.Name)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't describe nodegroup stack for nodegroup %s", t.nodegroup.Name)
 	}
-	asgName, err := t.stackCollection.GetAutoScalingGroupName(ngStack)
+	asgName, err := t.stackCollection.GetAutoScalingGroupName(context.TODO(), ngStack)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't get autoscalinggroup name nodegroup %s", t.nodegroup.Name)
 	}
-	_, err = t.asg.SuspendProcesses(&autoscaling.ScalingProcessQuery{
+	_, err = t.asg.SuspendProcesses(t.ctx, &autoscaling.SuspendProcessesInput{
 		AutoScalingGroupName: aws.String(asgName),
-		ScalingProcesses:     aws.StringSlice(t.nodegroup.ASGSuspendProcesses),
+		ScalingProcesses:     t.nodegroup.ASGSuspendProcesses,
 	})
 	logger.Info("suspended ASG processes %v for %s", t.nodegroup.ASGSuspendProcesses, t.nodegroup.Name)
 	return err
@@ -203,6 +205,7 @@ func (t *suspendProcesses) Do() error {
 func newSuspendProcesses(c *ClusterProvider, spec *api.ClusterConfig, nodegroup *api.NodeGroupBase) tasks.Task {
 	return tasks.SynchronousTask{
 		SynchronousTaskIface: &suspendProcesses{
+			ctx:             context.Background(),
 			asg:             c.Provider.ASG(),
 			stackCollection: c.NewStackManager(spec),
 			nodegroup:       nodegroup,

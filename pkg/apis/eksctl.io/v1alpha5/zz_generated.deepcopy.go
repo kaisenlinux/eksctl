@@ -1151,6 +1151,11 @@ func (in *NodeGroupBase) DeepCopyInto(out *NodeGroupBase) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PropagateASGTags != nil {
+		in, out := &in.PropagateASGTags, &out.PropagateASGTags
+		*out = new(bool)
+		**out = **in
+	}
 	if in.DisableIMDSv1 != nil {
 		in, out := &in.DisableIMDSv1, &out.DisableIMDSv1
 		*out = new(bool)

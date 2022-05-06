@@ -112,6 +112,9 @@ func ValidateClusterConfig(cfg *ClusterConfig) error {
 		if err := validateNg(ng.NodeGroupBase, path); err != nil {
 			return err
 		}
+		if ng.DisableASGTagPropagation != nil {
+			logger.Warning("field DisableASGTagPropagation for nodegroup has been deprecated and has no effect. Please use PropagateASGTags instead for nodegroup %s!", ng.Name)
+		}
 	}
 
 	for i, ng := range cfg.ManagedNodeGroups {
@@ -267,7 +270,6 @@ func (c *ClusterConfig) unsupportedVPCCNIAddonVersion() (bool, error) {
 	for _, addon := range c.Addons {
 		if addon.Name == VPCCNIAddon {
 			if addon.Version == "" {
-				addon.Version = minimumVPCCNIVersionForIPv6
 				return false, nil
 			}
 			if addon.Version == "latest" {
@@ -628,6 +630,10 @@ func ValidateNodeGroup(i int, ng *NodeGroup) error {
 		}
 	}
 
+	if ng.AMI != "" && ng.OverrideBootstrapCommand == nil {
+		return errors.Errorf("%s.overrideBootstrapCommand is required when using a custom AMI (%s.ami)", path, path)
+	}
+
 	if err := validateTaints(ng.Taints); err != nil {
 		return err
 	}
@@ -660,12 +666,13 @@ func ValidateNodeGroup(i int, ng *NodeGroup) error {
 			return fieldNotSupported("kubeletExtraConfig")
 		}
 
-		if ng.AMIFamily == NodeImageFamilyBottlerocket && ng.PreBootstrapCommands != nil {
-			return fieldNotSupported("preBootstrapCommands")
-
-		}
-		if ng.OverrideBootstrapCommand != nil {
-			return fieldNotSupported("overrideBootstrapCommand")
+		if ng.AMIFamily == NodeImageFamilyBottlerocket {
+			if ng.PreBootstrapCommands != nil {
+				return fieldNotSupported("preBootstrapCommands")
+			}
+			if ng.OverrideBootstrapCommand != nil {
+				return fieldNotSupported("overrideBootstrapCommand")
+			}
 		}
 	} else if err := validateNodeGroupKubeletExtraConfig(ng.KubeletExtraConfig); err != nil {
 		return err
@@ -691,12 +698,13 @@ func ValidateNodeGroup(i int, ng *NodeGroup) error {
 	}
 
 	if ng.ContainerRuntime != nil {
-		if *ng.ContainerRuntime == ContainerRuntimeContainerD && ng.AMIFamily != NodeImageFamilyAmazonLinux2 {
-			// check if it's dockerd or containerd
-			return fmt.Errorf("%s as runtime is only support for AL2 ami family", ContainerRuntimeContainerD)
+		if *ng.ContainerRuntime == ContainerRuntimeContainerD {
+			if ng.AMIFamily != NodeImageFamilyAmazonLinux2 && !IsWindowsImage(ng.AMIFamily) {
+				return fmt.Errorf("%s as runtime is only supported for AL2 or Windows ami family", ContainerRuntimeContainerD)
+			}
 		}
-		if *ng.ContainerRuntime != ContainerRuntimeDockerD && *ng.ContainerRuntime != ContainerRuntimeContainerD {
-			return fmt.Errorf("only %s and %s are supported for container runtime", ContainerRuntimeContainerD, ContainerRuntimeDockerD)
+		if *ng.ContainerRuntime != ContainerRuntimeDockerD && *ng.ContainerRuntime != ContainerRuntimeContainerD && *ng.ContainerRuntime != ContainerRuntimeDockerForWindows {
+			return fmt.Errorf("only %s, %s and %s are supported for container runtime", ContainerRuntimeContainerD, ContainerRuntimeDockerD, ContainerRuntimeDockerForWindows)
 		}
 	}
 

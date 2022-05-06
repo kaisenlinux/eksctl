@@ -14,7 +14,7 @@ kind: ClusterConfig
 metadata:
   name: exmaple-cluster
   region: us-west-2
-  version: "1.18"
+  version: "1.19"
 
 iam:
   withOIDC: true
@@ -46,6 +46,8 @@ addons:
 ```
 
 You can specify at most one of `attachPolicy`, `attachPolicyARNs` and `serviceAccountRoleARN`.
+
+If none of these are specified, the addon will be created with a role that has all recommended policies attached.
 
 !!!note
     In order to attach policies to addons your cluster must have `OIDC` enabled. If it's not enabled we ignore any policies

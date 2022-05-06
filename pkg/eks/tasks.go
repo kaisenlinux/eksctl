@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 
 	"github.com/weaveworks/eksctl/pkg/actions/identityproviders"
 	"github.com/weaveworks/eksctl/pkg/windows"
@@ -73,6 +73,7 @@ func (w *WindowsIPAMTask) Describe() string {
 
 // VPCControllerTask represents a task to install the VPC controller
 type VPCControllerTask struct {
+	Context         context.Context
 	Info            string
 	ClusterProvider *ClusterProvider
 	ClusterConfig   *api.ClusterConfig
@@ -105,7 +106,7 @@ func (v *VPCControllerTask) Do(errCh chan error) error {
 
 	// TODO PlanMode doesn't work as intended
 	vpcController := addons.NewVPCController(rawClient, irsa, v.ClusterConfig.Status, v.ClusterProvider.Provider.Region(), v.PlanMode)
-	if err := vpcController.Deploy(); err != nil {
+	if err := vpcController.Deploy(v.Context); err != nil {
 		return errors.Wrap(err, "error installing VPC controller")
 	}
 	return nil
@@ -219,7 +220,7 @@ func (t *restartDaemonsetTask) Do(errCh chan error) error {
 }
 
 // CreateExtraClusterConfigTasks returns all tasks for updating cluster configuration not depending on the control plane availability
-func (c *ClusterProvider) CreateExtraClusterConfigTasks(cfg *api.ClusterConfig) *tasks.TaskTree {
+func (c *ClusterProvider) CreateExtraClusterConfigTasks(ctx context.Context, cfg *api.ClusterConfig) *tasks.TaskTree {
 	newTasks := &tasks.TaskTree{
 		Parallel:  false,
 		IsSubTask: true,
@@ -245,10 +246,10 @@ func (c *ClusterProvider) CreateExtraClusterConfigTasks(cfg *api.ClusterConfig) 
 				info: "update CloudWatch log retention",
 				spec: cfg,
 				call: func(clusterConfig *api.ClusterConfig) error {
-					_, err := c.Provider.CloudWatchLogs().PutRetentionPolicy(&cloudwatchlogs.PutRetentionPolicyInput{
+					_, err := c.Provider.CloudWatchLogs().PutRetentionPolicy(ctx, &cloudwatchlogs.PutRetentionPolicyInput{
 						// The format for log group name is documented here: https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html
 						LogGroupName:    aws.String(fmt.Sprintf("/aws/eks/%s/cluster", cfg.Metadata.Name)),
-						RetentionInDays: aws.Int64(int64(logRetentionDays)),
+						RetentionInDays: aws.Int32(int32(logRetentionDays)),
 					})
 					if err != nil {
 						return errors.Wrap(err, "error updating log retention settings")
@@ -271,7 +272,7 @@ func (c *ClusterProvider) CreateExtraClusterConfigTasks(cfg *api.ClusterConfig) 
 	}
 
 	if api.IsEnabled(cfg.IAM.WithOIDC) {
-		c.appendCreateTasksForIAMServiceAccounts(cfg, newTasks)
+		c.appendCreateTasksForIAMServiceAccounts(ctx, cfg, newTasks)
 	}
 
 	if len(cfg.IdentityProviders) > 0 {
@@ -390,7 +391,7 @@ func (c *ClusterProvider) ClusterTasksForNodeGroups(cfg *api.ClusterConfig, inst
 	return tasks
 }
 
-func (c *ClusterProvider) appendCreateTasksForIAMServiceAccounts(cfg *api.ClusterConfig, tasks *tasks.TaskTree) {
+func (c *ClusterProvider) appendCreateTasksForIAMServiceAccounts(ctx context.Context, cfg *api.ClusterConfig, tasks *tasks.TaskTree) {
 	// we don't have all the information to construct full iamoidc.OpenIDConnectManager now,
 	// instead we just create a reference that gets updated when first task runs, and gets
 	// used by this would be more elegant if it was all done via CloudFormation and we didn't
@@ -405,7 +406,7 @@ func (c *ClusterProvider) appendCreateTasksForIAMServiceAccounts(cfg *api.Cluste
 			if err != nil {
 				return err
 			}
-			if err := oidc.CreateProvider(); err != nil {
+			if err := oidc.CreateProvider(ctx); err != nil {
 				return err
 			}
 			*oidcPlaceholder = *oidc
