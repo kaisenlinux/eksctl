@@ -353,6 +353,12 @@ const (
 	supportedKarpenterVersionMinor = 9
 )
 
+// Values for Capacity Reservation Preference
+const (
+	OpenCapacityReservation = "open"
+	NoneCapacityReservation = "none"
+)
+
 var (
 	// DefaultIPFamily defines the default IP family to use when creating a new VPC and cluster.
 	DefaultIPFamily = IPV4Family
@@ -1041,7 +1047,10 @@ func (n *NodeGroup) InstanceTypeList() []string {
 	if HasMixedInstances(n) {
 		return n.InstancesDistribution.InstanceTypes
 	}
-	return []string{n.InstanceType}
+	if n.InstanceType != "" {
+		return []string{n.InstanceType}
+	}
+	return nil
 }
 
 // NGTaints implements NodePool
@@ -1268,6 +1277,9 @@ type NodePool interface {
 
 	// NGTaints returns the taints to apply for this nodegroup
 	NGTaints() []NodeGroupTaint
+
+	// InstanceTypeList returns a list of instances that are configured for that nodegroup
+	InstanceTypeList() []string
 }
 
 // VolumeMapping Additional Volume Configurations
@@ -1425,6 +1437,24 @@ type NodeGroupBase struct {
 	// Enable EC2 detailed monitoring
 	// +optional
 	EnableDetailedMonitoring *bool `json:"enableDetailedMonitoring,omitempty"`
+
+	// CapacityReservation defines reservation policy for a nodegroup
+	CapacityReservation *CapacityReservation `json:"capacityReservation,omitempty"`
+}
+
+// CapacityReservation defines a nodegroup's Capacity Reservation targeting option
+// +optional
+type CapacityReservation struct {
+	// CapacityReservationPreference defines a nodegroup's Capacity Reservation preferences (either 'open' or 'none')
+	CapacityReservationPreference *string `json:"capacityReservationPreference,omitempty"`
+
+	// CapacityReservationTarget defines a nodegroup's target Capacity Reservation or Capacity Reservation group (not both at the same time).
+	CapacityReservationTarget *CapacityReservationTarget `json:"capacityReservationTarget,omitempty"`
+}
+
+type CapacityReservationTarget struct {
+	CapacityReservationID               *string `json:"capacityReservationID,omitempty"`
+	CapacityReservationResourceGroupARN *string `json:"capacityReservationResourceGroupARN,omitempty"`
 }
 
 // Placement specifies placement group information
@@ -1523,7 +1553,10 @@ func (m *ManagedNodeGroup) InstanceTypeList() []string {
 	if len(m.InstanceTypes) > 0 {
 		return m.InstanceTypes
 	}
-	return []string{m.InstanceType}
+	if m.InstanceType != "" {
+		return []string{m.InstanceType}
+	}
+	return nil
 }
 
 func (m *ManagedNodeGroup) ListOptions() metav1.ListOptions {
