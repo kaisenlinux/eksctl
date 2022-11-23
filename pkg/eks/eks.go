@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	awseks "github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
-	"github.com/aws/aws-sdk-go/aws/arn"
 
 	"github.com/kris-nova/logger"
 	"github.com/pkg/errors"
@@ -208,7 +208,7 @@ func (c *ClusterProvider) GetCluster(ctx context.Context, clusterName string) (*
 	if output.Cluster.Status == ekstypes.ClusterStatusActive {
 		if logger.Level >= 4 {
 			spec := &api.ClusterConfig{Metadata: &api.ClusterMeta{Name: clusterName}}
-			stacks, err := c.NewStackManager(spec).ListStacks(ctx)
+			stacks, err := c.NewStackManager(spec).ListStacksWithStatuses(ctx)
 			if err != nil {
 				return nil, errors.Wrapf(err, "listing CloudFormation stack for %q", clusterName)
 			}

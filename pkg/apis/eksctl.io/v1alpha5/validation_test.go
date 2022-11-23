@@ -112,21 +112,17 @@ var _ = Describe("ClusterConfig validation", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("containerd is only allowed for AL2 or Windows", func() {
+		It("should reject docker runtime if version is 1.24 or greater", func() {
 			cfg := api.NewClusterConfig()
+			cfg.Metadata.Version = api.Version1_24
 			ng0 := cfg.NewNodeGroup()
 			ng0.Name = "node-group"
-			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeContainerD)
-			ng0.AMIFamily = api.NodeImageFamilyBottlerocket
+			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeDockerD)
 			err := api.ValidateClusterConfig(cfg)
 			Expect(err).NotTo(HaveOccurred())
 			err = api.ValidateNodeGroup(0, ng0, cfg)
 			Expect(err).To(HaveOccurred())
-			ng0.AMIFamily = api.NodeImageFamilyWindowsServer2019CoreContainer
-			err = api.ValidateClusterConfig(cfg)
-			Expect(err).NotTo(HaveOccurred())
-			err = api.ValidateNodeGroup(0, ng0, cfg)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("only %s is supported for container runtime, starting with EKS version %s", api.ContainerRuntimeContainerD, api.Version1_24))))
 		})
 
 		It("containerd cannot be set together with overrideBootstrapCommand", func() {
@@ -967,7 +963,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				})
 
 				When("ipFamily is set to IPv6 but no managed addons are provided", func() {
-					It("it returns an error including which addons are missing", func() {
+					It("returns an error including which addons are missing", func() {
 						cfg.VPC.NAT = nil
 						cfg.IAM = &api.ClusterIAM{
 							WithOIDC: api.Enabled(),
@@ -1048,7 +1044,7 @@ var _ = Describe("ClusterConfig validation", func() {
 					})
 
 					When("the version of the vpc-cni is invalid", func() {
-						It("it returns an error", func() {
+						It("returns an error", func() {
 							cfg.Metadata.Version = api.Version1_22
 							cfg.IAM = &api.ClusterIAM{
 								WithOIDC: api.Enabled(),
@@ -1093,7 +1089,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				})
 
 				When("ipFamily is set to IPv6 and vpc.NAT is defined", func() {
-					It("it returns an error", func() {
+					It("returns an error", func() {
 						cfg.Metadata.Version = api.Version1_22
 						cfg.IAM = &api.ClusterIAM{
 							WithOIDC: api.Enabled(),
@@ -1110,7 +1106,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				})
 
 				When("ipFamily is set to IPv6 and serviceIPv4CIDR is not empty", func() {
-					It("it returns an error", func() {
+					It("returns an error", func() {
 						cfg.Metadata.Version = api.Version1_22
 						cfg.IAM = &api.ClusterIAM{
 							WithOIDC: api.Enabled(),
@@ -1128,7 +1124,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				})
 
 				When("ipFamily is set to IPv6 and AutoAllocateIPv6 is set", func() {
-					It("it returns an error", func() {
+					It("returns an error", func() {
 						cfg.VPC.AutoAllocateIPv6 = api.Enabled()
 						cfg.Metadata.Version = api.Version1_22
 						cfg.IAM = &api.ClusterIAM{
@@ -1444,13 +1440,13 @@ var _ = Describe("ClusterConfig validation", func() {
 				}
 			})
 
-			It("It doesn't panic when instance distribution is not enabled", func() {
+			It("doesn't panic when instance distribution is not enabled", func() {
 				ng.InstancesDistribution = nil
 				err := api.ValidateNodeGroup(0, ng, cfg)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
-			It("It doesn't fail when instance distribution is enabled and instanceType is \"mixed\"", func() {
+			It("doesn't fail when instance distribution is enabled and instanceType is \"mixed\"", func() {
 				ng.InstanceType = "mixed"
 				ng.InstancesDistribution.InstanceTypes = []string{"t3.medium"}
 
@@ -1466,7 +1462,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("ARM GPU instance types are not supported for unmanaged nodegroups with AMIFamily AmazonLinux2"))
 			})
 
-			It("fails in case of arm-gpu instance type", func() {
+			It("ARM-based GPU instance type fails for AmazonLinux2", func() {
 				ng.InstanceType = "g5g.medium"
 				ng.InstancesDistribution.InstanceTypes = nil
 				ng.AMIFamily = api.NodeImageFamilyAmazonLinux2
@@ -1474,7 +1470,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("ARM GPU instance types are not supported for unmanaged nodegroups with AMIFamily AmazonLinux2"))
 			})
 
-			It("It fails when instance distribution is enabled and instanceType set", func() {
+			It("fails when instance distribution is enabled and instanceType set", func() {
 				ng.InstanceType = "t3.small"
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
@@ -1482,7 +1478,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("instanceType should be \"mixed\" or unset when using the instances distribution feature"))
 			})
 
-			It("It fails when the instance distribution doesn't have any instance type", func() {
+			It("fails when the instance distribution doesn't have any instance type", func() {
 				ng.InstanceType = "mixed"
 				ng.InstancesDistribution.InstanceTypes = []string{}
 
@@ -1490,14 +1486,14 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("at least two instance types have to be specified for mixed nodegroups"))
 			})
 
-			It("It fails when the onDemandBaseCapacity is not above 0", func() {
+			It("fails when the onDemandBaseCapacity is not above 0", func() {
 				ng.InstancesDistribution.OnDemandBaseCapacity = newInt(-1)
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
 				Expect(err).To(MatchError("onDemandBaseCapacity should be 0 or more"))
 			})
 
-			It("It fails when the spotInstancePools is not between 1 and 20", func() {
+			It("fails when the spotInstancePools is not between 1 and 20", func() {
 				ng.InstancesDistribution.SpotInstancePools = newInt(0)
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
@@ -1509,7 +1505,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("spotInstancePools should be between 1 and 20"))
 			})
 
-			It("It fails when the onDemandPercentageAboveBaseCapacity is not between 0 and 100", func() {
+			It("fails when the onDemandPercentageAboveBaseCapacity is not between 0 and 100", func() {
 				ng.InstancesDistribution.OnDemandPercentageAboveBaseCapacity = newInt(-1)
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
@@ -1520,14 +1516,14 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("percentageAboveBase should be between 0 and 100"))
 			})
 
-			It("It fails when the spotAllocationStrategy is not a supported strategy", func() {
+			It("fails when the spotAllocationStrategy is not a supported strategy", func() {
 				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("unsupported-strategy")
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
 				Expect(err).To(MatchError("spotAllocationStrategy should be one of: lowest-price, capacity-optimized, capacity-optimized-prioritized"))
 			})
 
-			It("It fails when the spotAllocationStrategy is capacity-optimized and spotInstancePools is specified", func() {
+			It("fails when the spotAllocationStrategy is capacity-optimized and spotInstancePools is specified", func() {
 				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("capacity-optimized")
 				ng.InstancesDistribution.SpotInstancePools = newInt(2)
 
@@ -1535,7 +1531,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("spotInstancePools cannot be specified when also specifying spotAllocationStrategy: capacity-optimized"))
 			})
 
-			It("It fails when the spotAllocationStrategy is capacity-optimized-prioritized and spotInstancePools is specified", func() {
+			It("fails when the spotAllocationStrategy is capacity-optimized-prioritized and spotInstancePools is specified", func() {
 				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("capacity-optimized-prioritized")
 				ng.InstancesDistribution.SpotInstancePools = newInt(2)
 
@@ -1543,7 +1539,7 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError("spotInstancePools cannot be specified when also specifying spotAllocationStrategy: capacity-optimized-prioritized"))
 			})
 
-			It("It does not fail when the spotAllocationStrategy is lowest-price and spotInstancePools is specified", func() {
+			It("does not fail when the spotAllocationStrategy is lowest-price and spotInstancePools is specified", func() {
 				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("lowest-price")
 				ng.InstancesDistribution.SpotInstancePools = newInt(2)
 
@@ -1857,7 +1853,7 @@ var _ = Describe("ClusterConfig validation", func() {
 		It("fails when the AMIFamily is not supported", func() {
 			ng.AMIFamily = "SomeTrash"
 			err := api.ValidateNodeGroup(0, ng, cfg)
-			Expect(err).To(MatchError("AMI Family SomeTrash is not supported - use one of: AmazonLinux2, Ubuntu2004, Ubuntu1804, Bottlerocket, WindowsServer2019CoreContainer, WindowsServer2019FullContainer"))
+			Expect(err).To(MatchError("AMI Family SomeTrash is not supported - use one of: AmazonLinux2, Ubuntu2004, Ubuntu1804, Bottlerocket, WindowsServer2019CoreContainer, WindowsServer2019FullContainer, WindowsServer2022CoreContainer, WindowsServer2022FullContainer"))
 		})
 
 		It("fails when the AMIFamily is WindowsServer2004CoreContainer", func() {
@@ -1912,7 +1908,7 @@ var _ = Describe("ClusterConfig validation", func() {
 		It("returns an error when OIDC is not set", func() {
 			cfg := api.NewClusterConfig()
 			cfg.Karpenter = &api.Karpenter{
-				Version: "0.6.1",
+				Version: "0.17.0",
 			}
 			Expect(api.ValidateClusterConfig(cfg)).To(MatchError(ContainSubstring("failed to validate Karpenter config: iam.withOIDC must be enabled with Karpenter")))
 		})
@@ -1936,9 +1932,9 @@ var _ = Describe("ClusterConfig validation", func() {
 			cfg := api.NewClusterConfig()
 			cfg.IAM.WithOIDC = aws.Bool(true)
 			cfg.Karpenter = &api.Karpenter{
-				Version: "0.16.1",
+				Version: "v0.14.1",
 			}
-			Expect(api.ValidateClusterConfig(cfg)).To(MatchError(ContainSubstring("failed to validate Karpenter config: maximum supported version is 0.15.0")))
+			Expect(api.ValidateClusterConfig(cfg)).To(MatchError(ContainSubstring("failed to validate Karpenter config: minimum supported version is v0.17.0")))
 		})
 	})
 
@@ -2087,6 +2083,82 @@ var _ = Describe("ClusterConfig validation", func() {
 				Expect(err).To(MatchError(ContainSubstring("field secretsEncryption.keyARN is required for enabling secrets encryption")))
 			})
 		})
+	})
+
+	Describe("Scaling config", func() {
+		var (
+			mng   *api.ManagedNodeGroup
+			zero  int
+			one   int
+			two   int
+			three int
+		)
+
+		BeforeEach(func() {
+			mng = api.NewManagedNodeGroup()
+			mng.AMIFamily = "bOTTLEROCKEt"
+			zero = 0
+			one = 1
+			two = 2
+			three = 3
+		})
+
+		When("No config is specified", func() {
+			It("Should set the defaults", func() {
+				Expect(api.ValidateManagedNodeGroup(0, mng)).To(Succeed())
+				Expect(*mng.MinSize).To(Equal(api.DefaultNodeCount))
+				Expect(*mng.MaxSize).To(Equal(api.DefaultNodeCount))
+				Expect(*mng.DesiredCapacity).To(Equal(api.DefaultNodeCount))
+			})
+		})
+
+		When("DesiredCapacity is zero", func() {
+			It("Should set min to zero and max to 1", func() {
+				mng.DesiredCapacity = &zero
+				Expect(api.ValidateManagedNodeGroup(0, mng)).To(Succeed())
+				Expect(*mng.MinSize).To(Equal(0))
+				Expect(*mng.MaxSize).To(Equal(1))
+			})
+		})
+
+		When("DesiredCapacity is greater than zero", func() {
+			It("Should set min and max equal to capacity", func() {
+				three := 3
+				mng.DesiredCapacity = &three
+				Expect(api.ValidateManagedNodeGroup(0, mng)).To(Succeed())
+				Expect(*mng.MinSize).To(Equal(*mng.DesiredCapacity))
+				Expect(*mng.MaxSize).To(Equal(*mng.DesiredCapacity))
+			})
+		})
+
+		DescribeTable("Invalid config values", func(config api.ScalingConfig, expectedErr string) {
+			mng.ScalingConfig = &config
+			err := api.ValidateManagedNodeGroup(0, mng)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(expectedErr))
+		},
+			Entry("Desired capacity is lower than min",
+				api.ScalingConfig{
+					DesiredCapacity: &one,
+					MinSize:         &two,
+				},
+				fmt.Sprintf("cannot use --nodes-min=%d and --nodes=%d at the same time", 2, 1),
+			),
+			Entry("Desired capacity is greater than max",
+				api.ScalingConfig{
+					DesiredCapacity: &three,
+					MaxSize:         &two,
+				},
+				fmt.Sprintf("cannot use --nodes-max=%d and --nodes=%d at the same time", 2, 3),
+			),
+			Entry("Min is greater than max",
+				api.ScalingConfig{
+					MinSize: &two,
+					MaxSize: &one,
+				},
+				fmt.Sprintf("cannot use --nodes-min=%d and --nodes-max=%d at the same time", 2, 1),
+			),
+		)
 	})
 
 	Describe("Capacity Reservation validation", func() {

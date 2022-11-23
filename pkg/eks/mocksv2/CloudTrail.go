@@ -195,6 +195,36 @@ func (_m *CloudTrail) DeleteTrail(ctx context.Context, params *cloudtrail.Delete
 	return r0, r1
 }
 
+// DeregisterOrganizationDelegatedAdmin provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) DeregisterOrganizationDelegatedAdmin(ctx context.Context, params *cloudtrail.DeregisterOrganizationDelegatedAdminInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.DeregisterOrganizationDelegatedAdminOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.DeregisterOrganizationDelegatedAdminOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.DeregisterOrganizationDelegatedAdminInput, ...func(*cloudtrail.Options)) *cloudtrail.DeregisterOrganizationDelegatedAdminOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.DeregisterOrganizationDelegatedAdminOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.DeregisterOrganizationDelegatedAdminInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DescribeQuery provides a mock function with given fields: ctx, params, optFns
 func (_m *CloudTrail) DescribeQuery(ctx context.Context, params *cloudtrail.DescribeQueryInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.DescribeQueryOutput, error) {
 	_va := make([]interface{}, len(optFns))
@@ -255,6 +285,36 @@ func (_m *CloudTrail) DescribeTrails(ctx context.Context, params *cloudtrail.Des
 	return r0, r1
 }
 
+// GetChannel provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) GetChannel(ctx context.Context, params *cloudtrail.GetChannelInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.GetChannelOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.GetChannelOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.GetChannelInput, ...func(*cloudtrail.Options)) *cloudtrail.GetChannelOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.GetChannelOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.GetChannelInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetEventDataStore provides a mock function with given fields: ctx, params, optFns
 func (_m *CloudTrail) GetEventDataStore(ctx context.Context, params *cloudtrail.GetEventDataStoreInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.GetEventDataStoreOutput, error) {
 	_va := make([]interface{}, len(optFns))
@@ -307,6 +367,36 @@ func (_m *CloudTrail) GetEventSelectors(ctx context.Context, params *cloudtrail.
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.GetEventSelectorsInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetImport provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) GetImport(ctx context.Context, params *cloudtrail.GetImportInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.GetImportOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.GetImportOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.GetImportInput, ...func(*cloudtrail.Options)) *cloudtrail.GetImportOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.GetImportOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.GetImportInput, ...func(*cloudtrail.Options)) error); ok {
 		r1 = rf(ctx, params, optFns...)
 	} else {
 		r1 = ret.Error(1)
@@ -435,6 +525,36 @@ func (_m *CloudTrail) GetTrailStatus(ctx context.Context, params *cloudtrail.Get
 	return r0, r1
 }
 
+// ListChannels provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) ListChannels(ctx context.Context, params *cloudtrail.ListChannelsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.ListChannelsOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.ListChannelsOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.ListChannelsInput, ...func(*cloudtrail.Options)) *cloudtrail.ListChannelsOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.ListChannelsOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.ListChannelsInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListEventDataStores provides a mock function with given fields: ctx, params, optFns
 func (_m *CloudTrail) ListEventDataStores(ctx context.Context, params *cloudtrail.ListEventDataStoresInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.ListEventDataStoresOutput, error) {
 	_va := make([]interface{}, len(optFns))
@@ -457,6 +577,66 @@ func (_m *CloudTrail) ListEventDataStores(ctx context.Context, params *cloudtrai
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.ListEventDataStoresInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListImportFailures provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) ListImportFailures(ctx context.Context, params *cloudtrail.ListImportFailuresInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.ListImportFailuresOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.ListImportFailuresOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.ListImportFailuresInput, ...func(*cloudtrail.Options)) *cloudtrail.ListImportFailuresOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.ListImportFailuresOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.ListImportFailuresInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListImports provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) ListImports(ctx context.Context, params *cloudtrail.ListImportsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.ListImportsOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.ListImportsOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.ListImportsInput, ...func(*cloudtrail.Options)) *cloudtrail.ListImportsOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.ListImportsOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.ListImportsInput, ...func(*cloudtrail.Options)) error); ok {
 		r1 = rf(ctx, params, optFns...)
 	} else {
 		r1 = ret.Error(1)
@@ -675,6 +855,36 @@ func (_m *CloudTrail) PutInsightSelectors(ctx context.Context, params *cloudtrai
 	return r0, r1
 }
 
+// RegisterOrganizationDelegatedAdmin provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) RegisterOrganizationDelegatedAdmin(ctx context.Context, params *cloudtrail.RegisterOrganizationDelegatedAdminInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.RegisterOrganizationDelegatedAdminOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.RegisterOrganizationDelegatedAdminOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.RegisterOrganizationDelegatedAdminInput, ...func(*cloudtrail.Options)) *cloudtrail.RegisterOrganizationDelegatedAdminOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.RegisterOrganizationDelegatedAdminOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.RegisterOrganizationDelegatedAdminInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // RemoveTags provides a mock function with given fields: ctx, params, optFns
 func (_m *CloudTrail) RemoveTags(ctx context.Context, params *cloudtrail.RemoveTagsInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.RemoveTagsOutput, error) {
 	_va := make([]interface{}, len(optFns))
@@ -735,6 +945,36 @@ func (_m *CloudTrail) RestoreEventDataStore(ctx context.Context, params *cloudtr
 	return r0, r1
 }
 
+// StartImport provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) StartImport(ctx context.Context, params *cloudtrail.StartImportInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.StartImportOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.StartImportOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.StartImportInput, ...func(*cloudtrail.Options)) *cloudtrail.StartImportOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.StartImportOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.StartImportInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // StartLogging provides a mock function with given fields: ctx, params, optFns
 func (_m *CloudTrail) StartLogging(ctx context.Context, params *cloudtrail.StartLoggingInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.StartLoggingOutput, error) {
 	_va := make([]interface{}, len(optFns))
@@ -787,6 +1027,36 @@ func (_m *CloudTrail) StartQuery(ctx context.Context, params *cloudtrail.StartQu
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.StartQueryInput, ...func(*cloudtrail.Options)) error); ok {
+		r1 = rf(ctx, params, optFns...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// StopImport provides a mock function with given fields: ctx, params, optFns
+func (_m *CloudTrail) StopImport(ctx context.Context, params *cloudtrail.StopImportInput, optFns ...func(*cloudtrail.Options)) (*cloudtrail.StopImportOutput, error) {
+	_va := make([]interface{}, len(optFns))
+	for _i := range optFns {
+		_va[_i] = optFns[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *cloudtrail.StopImportOutput
+	if rf, ok := ret.Get(0).(func(context.Context, *cloudtrail.StopImportInput, ...func(*cloudtrail.Options)) *cloudtrail.StopImportOutput); ok {
+		r0 = rf(ctx, params, optFns...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*cloudtrail.StopImportOutput)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *cloudtrail.StopImportInput, ...func(*cloudtrail.Options)) error); ok {
 		r1 = rf(ctx, params, optFns...)
 	} else {
 		r1 = ret.Error(1)

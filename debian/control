@@ -3,7 +3,7 @@ Section: admin
 Priority: optional
 Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 Build-Depends: debhelper-compat (= 13),
-	       golang-go (>= 1.17),
+	       golang-go (>= 1.18),
 	       dh-golang,
 	       mkdocs,
 Standards-Version: 4.6.0
@@ -17,5 +17,5 @@ Package: eksctl
 Architecture: amd64 arm64
 Depends: ${shlibs:Depends},
 	 ${misc:Depends},
-	 golang-go (>= 1.17)
+	 golang-go (>= 1.18)
 Description: The official CLI for Amazon EKS

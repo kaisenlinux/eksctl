@@ -1,6 +1,7 @@
 package addon_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	"github.com/kris-nova/logger"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
@@ -80,6 +82,11 @@ var _ = Describe("Create", func() {
 		Expect(err).NotTo(HaveOccurred())
 		oidc.ProviderARN = "arn:aws:iam::456123987123:oidc-provider/oidc.eks.us-west-2.amazonaws.com/id/A39A2842863C47208955D753DE205E6E"
 
+		mockProvider.MockEKS().On("DescribeAddon", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+			Expect(args).To(HaveLen(2))
+			Expect(args[1]).To(BeAssignableToTypeOf(&eks.DescribeAddonInput{}))
+		}).Return(nil, &ekstypes.ResourceNotFoundException{}).Once()
+
 		mockProvider.MockEKS().On("CreateAddon", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 			Expect(args).To(HaveLen(2))
 			Expect(args[1]).To(BeAssignableToTypeOf(&eks.CreateAddonInput{}))
@@ -118,6 +125,64 @@ var _ = Describe("Create", func() {
 				},
 			},
 		}, nil)
+	})
+
+	When("the addon is already present in the cluster, as an EKS managed addon", func() {
+		When("the addon is in CREATE_FAILED state", func() {
+			BeforeEach(func() {
+				mockProvider.MockEKS().On("DescribeAddon", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+					Expect(args).To(HaveLen(2))
+					Expect(args[1]).To(BeAssignableToTypeOf(&eks.DescribeAddonInput{}))
+				}).Return(&eks.DescribeAddonOutput{
+					Addon: &ekstypes.Addon{
+						AddonName: aws.String("my-addon"),
+						Status:    ekstypes.AddonStatusCreateFailed,
+					},
+				}, nil)
+			})
+
+			It("will try to re-create the addon", func() {
+				err := manager.Create(context.Background(), &api.Addon{Name: "my-addon"}, 0)
+				Expect(err).NotTo(HaveOccurred())
+				mockProvider.MockEKS().AssertNumberOfCalls(GinkgoT(), "CreateAddon", 1)
+			})
+		})
+
+		When("the addon is in another state", func() {
+			BeforeEach(func() {
+				mockProvider.MockEKS().On("DescribeAddon", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+					Expect(args).To(HaveLen(2))
+					Expect(args[1]).To(BeAssignableToTypeOf(&eks.DescribeAddonInput{}))
+				}).Return(&eks.DescribeAddonOutput{
+					Addon: &ekstypes.Addon{
+						AddonName: aws.String("my-addon"),
+						Status:    ekstypes.AddonStatusActive,
+					},
+				}, nil)
+			})
+
+			It("won't re-create the addon", func() {
+				output := &bytes.Buffer{}
+				logger.Writer = output
+
+				err := manager.Create(context.Background(), &api.Addon{Name: "my-addon"}, 0)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(output.String()).To(ContainSubstring("Addon my-addon is already present in this cluster, as an EKS managed addon, and won't be re-created"))
+			})
+		})
+	})
+
+	When("looking up if the addon is already present fails", func() {
+		BeforeEach(func() {
+			mockProvider.MockEKS().On("DescribeAddon", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+				Expect(args).To(HaveLen(2))
+				Expect(args[1]).To(BeAssignableToTypeOf(&eks.DescribeAddonInput{}))
+			}).Return(nil, fmt.Errorf("test error"))
+		})
+		It("returns an error", func() {
+			err := manager.Create(context.Background(), &api.Addon{Name: "my-addon"}, 0)
+			Expect(err).To(MatchError(`test error`))
+		})
 	})
 
 	When("it fails to create addon", func() {
@@ -292,6 +357,24 @@ var _ = Describe("Create", func() {
 		})
 	})
 
+	When("resolveConflicts is configured", func() {
+		DescribeTable("AWS EKS resolve conflicts matches value from cluster config",
+			func(rc ekstypes.ResolveConflicts) {
+				err := manager.Create(context.Background(), &api.Addon{
+					Name:             "my-addon",
+					Version:          "latest",
+					ResolveConflicts: rc,
+				}, 0)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(createAddonInput.ResolveConflicts).To(Equal(rc))
+			},
+			Entry("none", ekstypes.ResolveConflictsNone),
+			Entry("overwrite", ekstypes.ResolveConflictsOverwrite),
+			Entry("preserve", ekstypes.ResolveConflictsPreserve),
+		)
+	})
+
 	When("force is true", func() {
 		BeforeEach(func() {
 			withOIDC = false
@@ -319,6 +402,9 @@ var _ = Describe("Create", func() {
 		When("the addon creation succeeds", func() {
 			BeforeEach(func() {
 				withOIDC = false
+			})
+
+			It("creates the addon and waits for it to be active", func() {
 				mockProvider.MockEKS().On("DescribeAddon", mock.Anything, mock.Anything).
 					Return(&eks.DescribeAddonOutput{
 						Addon: &ekstypes.Addon{
@@ -326,9 +412,7 @@ var _ = Describe("Create", func() {
 							Status:    ekstypes.AddonStatusActive,
 						},
 					}, nil)
-			})
 
-			It("creates the addon and waits for it to be active", func() {
 				err := manager.Create(context.Background(), &api.Addon{
 					Name:    "my-addon",
 					Version: "v1.0.0-eksbuild.1",
@@ -345,6 +429,9 @@ var _ = Describe("Create", func() {
 		When("the addon creation fails", func() {
 			BeforeEach(func() {
 				withOIDC = false
+			})
+
+			It("returns an error", func() {
 				mockProvider.MockEKS().On("DescribeAddon", mock.Anything, mock.Anything, mock.Anything).
 					Return(&eks.DescribeAddonOutput{
 						Addon: &ekstypes.Addon{
@@ -352,9 +439,7 @@ var _ = Describe("Create", func() {
 							Status:    ekstypes.AddonStatusDegraded,
 						},
 					}, nil)
-			})
 
-			It("returns an error", func() {
 				err := manager.Create(context.Background(), &api.Addon{
 					Name:    "my-addon",
 					Version: "v1.0.0-eksbuild.1",

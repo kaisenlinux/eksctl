@@ -346,7 +346,7 @@ const expected = `
 		"metadata": {
 		  "name": "test-3x3-ngs",
 		  "region": "eu-central-1",
-		  "version": "1.22"
+		  "version": "1.23"
 		},
 		"kubernetesNetworkConfig": {
         	"ipFamily": "IPv4"
@@ -657,7 +657,7 @@ type mockStackLister struct {
 	nodesResult []manager.NodeGroupStack
 }
 
-func (s *mockStackLister) ListNodeGroupStacks(_ context.Context) ([]manager.NodeGroupStack, error) {
+func (s *mockStackLister) ListNodeGroupStacksWithStatuses(_ context.Context) ([]manager.NodeGroupStack, error) {
 	return s.nodesResult, nil
 }
 

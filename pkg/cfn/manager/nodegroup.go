@@ -69,7 +69,10 @@ func (c *StackCollection) createManagedNodeGroupTask(ctx context.Context, errorC
 		return errors.New("managed nodegroups cannot be created on IPv6 unowned clusters")
 	}
 	logger.Info("building managed nodegroup stack %q", name)
-	bootstrapper := nodebootstrap.NewManagedBootstrapper(c.spec, ng)
+	bootstrapper, err := nodebootstrap.NewManagedBootstrapper(c.spec, ng)
+	if err != nil {
+		return err
+	}
 	stack := builder.NewManagedNodeGroup(c.ec2API, c.spec, ng, builder.NewLaunchTemplateFetcher(c.ec2API), bootstrapper, forceAddCNIPolicy, vpcImporter)
 	if err := stack.AddAllResources(ctx); err != nil {
 		return err
@@ -78,7 +81,8 @@ func (c *StackCollection) createManagedNodeGroupTask(ctx context.Context, errorC
 	return c.CreateStack(ctx, name, stack, ng.Tags, nil, errorCh)
 }
 
-func (c *StackCollection) propagateManagedNodeGroupTagsToASGTask(ctx context.Context, errorCh chan error, ng *api.ManagedNodeGroup) error {
+func (c *StackCollection) propagateManagedNodeGroupTagsToASGTask(ctx context.Context, errorCh chan error, ng *api.ManagedNodeGroup,
+	propagateFunc func(string, map[string]string, []string, chan error) error) error {
 	// describe node group to retrieve ASG names
 	input := &eks.DescribeNodegroupInput{
 		ClusterName:   aws.String(c.spec.Metadata.Name),
@@ -99,12 +103,24 @@ func (c *StackCollection) propagateManagedNodeGroupTagsToASGTask(ctx context.Con
 			asgNames = append(asgNames, *asg.Name)
 		}
 	}
-	return c.PropagateManagedNodeGroupTagsToASG(ng.Name, ng.Tags, asgNames, errorCh)
+
+	// add labels and taints
+	tags := map[string]string{}
+	builder.GenerateClusterAutoscalerTags(ng, func(key, value string) {
+		tags[key] = value
+	})
+
+	// add nodegroup tags
+	for k, v := range ng.Tags {
+		tags[k] = v
+	}
+
+	return propagateFunc(ng.Name, tags, asgNames, errorCh)
 }
 
-// DescribeNodeGroupStacks calls DescribeStacks and filters out nodegroups
-func (c *StackCollection) DescribeNodeGroupStacks(ctx context.Context) ([]*Stack, error) {
-	stacks, err := c.DescribeStacks(ctx)
+// ListNodeGroupStacks calls ListStacks and filters out nodegroups
+func (c *StackCollection) ListNodeGroupStacks(ctx context.Context) ([]*Stack, error) {
+	stacks, err := c.ListStacks(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +147,8 @@ func (c *StackCollection) DescribeNodeGroupStacks(ctx context.Context) ([]*Stack
 }
 
 // ListNodeGroupStacks returns a list of NodeGroupStacks
-func (c *StackCollection) ListNodeGroupStacks(ctx context.Context) ([]NodeGroupStack, error) {
-	stacks, err := c.DescribeNodeGroupStacks(ctx)
+func (c *StackCollection) ListNodeGroupStacksWithStatuses(ctx context.Context) ([]NodeGroupStack, error) {
+	stacks, err := c.ListNodeGroupStacks(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -151,10 +167,10 @@ func (c *StackCollection) ListNodeGroupStacks(ctx context.Context) ([]NodeGroupS
 	return nodeGroupStacks, nil
 }
 
-// DescribeNodeGroupStacksAndResources calls DescribeNodeGroupStacks and fetches all resources,
+// DescribeNodeGroupStacksAndResources calls DescribeNodeGroupStackList and fetches all resources,
 // then returns it in a map by nodegroup name
 func (c *StackCollection) DescribeNodeGroupStacksAndResources(ctx context.Context) (map[string]StackInfo, error) {
-	stacks, err := c.DescribeNodeGroupStacks(ctx)
+	stacks, err := c.ListNodeGroupStacks(ctx)
 	if err != nil {
 		return nil, err
 	}

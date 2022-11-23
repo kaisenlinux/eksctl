@@ -1,3 +1,11 @@
+eksctl (0.120.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import the 0.120.0 version
+  * Update the quilt patch
+  * The GOPATH is now set to use the _build folder
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Wed, 23 Nov 2022 14:23:08 +0100
+
 eksctl (0.112.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import the 0.112.0 version
