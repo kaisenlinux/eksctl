@@ -12,7 +12,7 @@ setting, you can create a cluster with `eksctl create cluster --config-file=<pat
 
 If you have created a cluster already, you can use `eksctl utils update-cluster-logging`.
 
-!!!note
+???+ note
     this command runs in plan mode by default, you will need to specify `--approve` flag to
     apply the changes to your cluster.
 
@@ -84,6 +84,14 @@ cloudWatch:
       - "authenticator"
 ```
 
+Note that by default, log data is stored in CloudWatch Logs indefinitely. This can be controlled with:
+
+```yaml
+cloudWatch:
+  clusterLogging:
+    logRetentionInDays: 7
+```
+
 Full example:
 
 ```yaml
@@ -102,6 +110,7 @@ nodeGroups:
 cloudWatch:
   clusterLogging:
     enableTypes: ["audit", "authenticator"]
+    logRetentionInDays: 7
 ```
 
 [eksdocs]: https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html

@@ -2,9 +2,12 @@ package nodegroup_test
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	awseks "github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -26,6 +29,17 @@ import (
 )
 
 var _ = Describe("Upgrade", func() {
+	supportedVersions := api.SupportedVersions()
+	if len(supportedVersions) < 2 {
+		Fail("Upgrade test requires at least two supported EKS versions")
+	}
+
+	var (
+		eksVersion        = aws.String(supportedVersions[len(supportedVersions)-2])
+		latestEKSVersion  = supportedVersions[len(supportedVersions)-1]
+		eksReleaseVersion = aws.String(fmt.Sprintf("%s-20201212", *eksVersion))
+	)
+
 	var (
 		clusterName, ngName string
 		p                   *mockprovider.MockProvider
@@ -49,14 +63,37 @@ var _ = Describe("Upgrade", func() {
 		m.SetStackManager(fakeStackManager)
 		options = nodegroup.UpgradeOptions{
 			NodegroupName:     ngName,
-			KubernetesVersion: "1.21",
+			KubernetesVersion: latestEKSVersion,
 			Wait:              false,
 			ForceUpgrade:      false,
 		}
 	})
 
-	When("the nodegroup does not have a stack", func() {
-		When("launchTemplate Id is set", func() {
+	Context("the nodegroup does not have a stack", func() {
+		When("the nodegroup does not use a launch template", func() {
+			BeforeEach(func() {
+				p.MockEKS().On("DescribeNodegroup", mock.Anything, &awseks.DescribeNodegroupInput{
+					ClusterName:   aws.String(clusterName),
+					NodegroupName: aws.String(ngName),
+				}).Return(&awseks.DescribeNodegroupOutput{
+					Nodegroup: &ekstypes.Nodegroup{
+						NodegroupName:  aws.String(ngName),
+						ClusterName:    aws.String(clusterName),
+						Status:         ekstypes.NodegroupStatusActive,
+						AmiType:        "ami-type",
+						Version:        eksVersion,
+						LaunchTemplate: nil,
+					},
+				}, nil)
+			})
+			It("returns an error if launch template version is specified", func() {
+				options.LaunchTemplateVersion = "2"
+				err := m.Upgrade(context.Background(), options)
+				Expect(err).To(MatchError(ContainSubstring("cannot update launch template version because the nodegroup is not configured to use one")))
+			})
+		})
+
+		When("the nodegroup uses launch template", func() {
 			BeforeEach(func() {
 				p.MockEKS().On("DescribeNodegroup", mock.Anything, &awseks.DescribeNodegroupInput{
 					ClusterName:   aws.String(clusterName),
@@ -67,69 +104,84 @@ var _ = Describe("Upgrade", func() {
 						ClusterName:   aws.String(clusterName),
 						Status:        ekstypes.NodegroupStatusActive,
 						AmiType:       "ami-type",
-						Version:       aws.String("1.20"),
+						Version:       eksVersion,
 						LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
-							Id: aws.String("id-123"),
+							Id:      aws.String("id-123"),
+							Version: aws.String("2"),
 						},
 					},
 				}, nil)
-
-				p.MockEKS().On("UpdateNodegroupVersion", mock.Anything, &awseks.UpdateNodegroupVersionInput{
-					NodegroupName: aws.String(ngName),
-					ClusterName:   aws.String(clusterName),
-					Force:         false,
-					Version:       aws.String("1.21"),
-					LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
-						Id:      aws.String("id-123"),
-						Version: aws.String("v2"),
-					},
-				}).Return(&awseks.UpdateNodegroupVersionOutput{}, nil)
 			})
-
-			It("upgrades the nodegroup version and lt by calling the API", func() {
-				options.LaunchTemplateVersion = "v2"
-				Expect(m.Upgrade(context.Background(), options)).To(Succeed())
-			})
-		})
-
-		When("launchTemplate name is set", func() {
-			BeforeEach(func() {
-				p.MockEKS().On("DescribeNodegroup", mock.Anything, &awseks.DescribeNodegroupInput{
-					ClusterName:   aws.String(clusterName),
-					NodegroupName: aws.String(ngName),
-				}).Return(&awseks.DescribeNodegroupOutput{
-					Nodegroup: &ekstypes.Nodegroup{
+			When("using a custom AMI", func() {
+				BeforeEach(func() {
+					p.MockEC2().On("DescribeLaunchTemplateVersions", mock.Anything, &ec2.DescribeLaunchTemplateVersionsInput{
+						LaunchTemplateId: aws.String("id-123"),
+						Versions:         []string{"2"},
+					}).Return(&ec2.DescribeLaunchTemplateVersionsOutput{LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+						{
+							LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+								ImageId:      aws.String("1234"),
+								InstanceType: "big",
+							},
+							VersionNumber: aws.Int64(2),
+						},
+					}}, nil)
+				})
+				It("returns an error if kubernetes version is specified", func() {
+					options.KubernetesVersion = api.DefaultVersion
+					err := m.Upgrade(context.Background(), options)
+					Expect(err).To(MatchError(ContainSubstring("cannot specify kubernetes-version when using a custom AMI")))
+				})
+				It("upgrades the nodegroup version and lt by calling the EKS API", func() {
+					p.MockEKS().On("UpdateNodegroupVersion", mock.Anything, &awseks.UpdateNodegroupVersionInput{
 						NodegroupName: aws.String(ngName),
 						ClusterName:   aws.String(clusterName),
-						Status:        ekstypes.NodegroupStatusActive,
-						AmiType:       ekstypes.AMITypesAl2X8664,
-						Version:       aws.String("1.20"),
+						Force:         false,
 						LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
-							Name: aws.String("lt"),
+							Id:      aws.String("id-123"),
+							Version: aws.String("2"),
 						},
-					},
-				}, nil)
-
-				p.MockEKS().On("UpdateNodegroupVersion", mock.Anything, &awseks.UpdateNodegroupVersionInput{
-					NodegroupName: aws.String(ngName),
-					ClusterName:   aws.String(clusterName),
-					Force:         false,
-					Version:       aws.String("1.21"),
-					LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
-						Name:    aws.String("lt"),
-						Version: aws.String("v2"),
-					},
-				}).Return(&awseks.UpdateNodegroupVersionOutput{}, nil)
+					}).Return(&awseks.UpdateNodegroupVersionOutput{}, nil)
+					options.KubernetesVersion = ""
+					options.LaunchTemplateVersion = "2"
+					Expect(m.Upgrade(context.Background(), options)).To(Succeed())
+				})
 			})
-
-			It("upgrades the nodegroup version and lt by calling the API", func() {
-				options.LaunchTemplateVersion = "v2"
-				Expect(m.Upgrade(context.Background(), options)).To(Succeed())
+			When("not using a custom AMI", func() {
+				BeforeEach(func() {
+					p.MockEC2().On("DescribeLaunchTemplateVersions", mock.Anything, &ec2.DescribeLaunchTemplateVersionsInput{
+						LaunchTemplateId: aws.String("id-123"),
+						Versions:         []string{"2"},
+					}).Return(&ec2.DescribeLaunchTemplateVersionsOutput{LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+						{
+							LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+								ImageId:      nil,
+								InstanceType: "big",
+							},
+							VersionNumber: aws.Int64(2),
+						},
+					}}, nil)
+				})
+				It("upgrades the nodegroup version and lt by calling the EKS API", func() {
+					p.MockEKS().On("UpdateNodegroupVersion", mock.Anything, &awseks.UpdateNodegroupVersionInput{
+						NodegroupName: aws.String(ngName),
+						ClusterName:   aws.String(clusterName),
+						Force:         false,
+						Version:       aws.String(api.Version1_22),
+						LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+							Id:      aws.String("id-123"),
+							Version: aws.String("2"),
+						},
+					}).Return(&awseks.UpdateNodegroupVersionOutput{}, nil)
+					options.KubernetesVersion = api.Version1_22
+					options.LaunchTemplateVersion = "2"
+					Expect(m.Upgrade(context.Background(), options)).To(Succeed())
+				})
 			})
 		})
 	})
 
-	When("the nodegroup does have a stack", func() {
+	Context("the nodegroup does have a stack", func() {
 		When("ForceUpdateEnabled isn't set", func() {
 			When("it uses amazonlinux2", func() {
 				BeforeEach(func() {
@@ -157,16 +209,16 @@ var _ = Describe("Upgrade", func() {
 							ClusterName:    aws.String(clusterName),
 							Status:         ekstypes.NodegroupStatusActive,
 							AmiType:        ekstypes.AMITypesAl2X8664,
-							Version:        aws.String("1.20"),
-							ReleaseVersion: aws.String("1.20-20201212"),
+							Version:        eksVersion,
+							ReleaseVersion: eksReleaseVersion,
 						},
 					}, nil)
 
 					p.MockSSM().On("GetParameter", mock.Anything, &ssm.GetParameterInput{
-						Name: aws.String("/aws/service/eks/optimized-ami/1.21/amazon-linux-2/recommended/release_version"),
+						Name: aws.String(fmt.Sprintf("/aws/service/eks/optimized-ami/%s/amazon-linux-2/recommended/release_version", latestEKSVersion)),
 					}).Return(&ssm.GetParameterOutput{
 						Parameter: &ssmtypes.Parameter{
-							Value: aws.String("1.21-20201212"),
+							Value: aws.String(fmt.Sprintf("%s-20201212", latestEKSVersion)),
 						},
 					}, nil)
 				})
@@ -219,16 +271,16 @@ var _ = Describe("Upgrade", func() {
 							ClusterName:    aws.String(clusterName),
 							Status:         ekstypes.NodegroupStatusActive,
 							AmiType:        ekstypes.AMITypesAl2X8664Gpu,
-							Version:        aws.String("1.20"),
-							ReleaseVersion: aws.String("1.20-20201212"),
+							Version:        eksVersion,
+							ReleaseVersion: eksReleaseVersion,
 						},
 					}, nil)
 
 					p.MockSSM().On("GetParameter", mock.Anything, &ssm.GetParameterInput{
-						Name: aws.String("/aws/service/eks/optimized-ami/1.21/amazon-linux-2-gpu/recommended/release_version"),
+						Name: aws.String(fmt.Sprintf("/aws/service/eks/optimized-ami/%s/amazon-linux-2-gpu/recommended/release_version", latestEKSVersion)),
 					}).Return(&ssm.GetParameterOutput{
 						Parameter: &ssmtypes.Parameter{
-							Value: aws.String("1.21-20201212"),
+							Value: aws.String(fmt.Sprintf("%s-20201212", latestEKSVersion)),
 						},
 					}, nil)
 				})
@@ -275,13 +327,13 @@ var _ = Describe("Upgrade", func() {
 							ClusterName:    aws.String(clusterName),
 							Status:         ekstypes.NodegroupStatusActive,
 							AmiType:        ekstypes.AMITypesBottlerocketX8664,
-							Version:        aws.String("1.20"),
-							ReleaseVersion: aws.String("1.20-20201212"),
+							Version:        eksVersion,
+							ReleaseVersion: eksReleaseVersion,
 						},
 					}, nil)
 
 					p.MockSSM().On("GetParameter", mock.Anything, &ssm.GetParameterInput{
-						Name: aws.String("/aws/service/bottlerocket/aws-k8s-1.21/x86_64/latest/image_version"),
+						Name: aws.String(fmt.Sprintf("/aws/service/bottlerocket/aws-k8s-%s/x86_64/latest/image_version", latestEKSVersion)),
 					}).Return(&ssm.GetParameterOutput{
 						Parameter: &ssmtypes.Parameter{
 							Value: aws.String("1.5.2-1602f3a8"),
@@ -322,8 +374,8 @@ var _ = Describe("Upgrade", func() {
 						ClusterName:    aws.String(clusterName),
 						Status:         ekstypes.NodegroupStatusUpdating,
 						AmiType:        ekstypes.AMITypesBottlerocketX8664,
-						Version:        aws.String("1.20"),
-						ReleaseVersion: aws.String("1.20-20201212"),
+						Version:        eksVersion,
+						ReleaseVersion: eksReleaseVersion,
 					},
 				}, nil)
 			})
@@ -344,8 +396,8 @@ var _ = Describe("Upgrade", func() {
 						ClusterName:    aws.String(clusterName),
 						Status:         ekstypes.NodegroupStatusDegraded,
 						AmiType:        ekstypes.AMITypesBottlerocketX8664,
-						Version:        aws.String("1.20"),
-						ReleaseVersion: aws.String("1.20-20201212"),
+						Version:        eksVersion,
+						ReleaseVersion: eksReleaseVersion,
 					},
 				}, nil)
 			})

@@ -140,14 +140,10 @@ func ValidateClusterConfig(cfg *ClusterConfig) error {
 		if cfg.Outpost.ControlPlaneOutpostARN == "" {
 			return errors.New("outpost.controlPlaneOutpostARN is required for Outposts")
 		}
-
 		if err := validateOutpostARN(cfg.Outpost.ControlPlaneOutpostARN); err != nil {
 			return err
 		}
 
-		if cfg.IsFullyPrivate() {
-			return errors.New("fully-private cluster (privateCluster.enabled) is not supported for Outposts")
-		}
 		if cfg.IPv6Enabled() {
 			return errors.New("IPv6 is not supported on Outposts")
 		}
@@ -212,19 +208,7 @@ func ValidateClusterConfig(cfg *ClusterConfig) error {
 
 // ValidateClusterVersion validates the cluster version.
 func ValidateClusterVersion(clusterConfig *ClusterConfig) error {
-	clusterVersion := clusterConfig.Metadata.Version
-	if clusterConfig.IsControlPlaneOnOutposts() {
-		switch clusterVersion {
-		case "":
-			return fmt.Errorf("cluster version must be explicitly set to %[1]s for Outposts clusters as only version %[1]s is currently supported", Version1_21)
-		case Version1_21:
-			return nil
-		default:
-			return fmt.Errorf("only version %s is supported on Outposts", Version1_21)
-		}
-	}
-
-	if clusterVersion != "" && clusterVersion != DefaultVersion && !IsSupportedVersion(clusterVersion) {
+	if clusterVersion := clusterConfig.Metadata.Version; clusterVersion != "" && clusterVersion != DefaultVersion && !IsSupportedVersion(clusterVersion) {
 		if IsDeprecatedVersion(clusterVersion) {
 			return fmt.Errorf("invalid version, %s is no longer supported, supported values: %s\nsee also: https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html", clusterVersion, strings.Join(SupportedVersions(), ", "))
 		}
@@ -464,7 +448,7 @@ func (c *ClusterConfig) ValidatePrivateCluster() error {
 				return errors.New("privateCluster.additionalEndpointServices cannot be set when privateCluster.skipEndpointCreation is true")
 			}
 			if err := ValidateAdditionalEndpointServices(additionalEndpoints); err != nil {
-				return errors.Wrap(err, "invalid value in privateCluster.additionalEndpointServices")
+				return fmt.Errorf("invalid value in privateCluster.additionalEndpointServices: %w", err)
 			}
 		}
 
@@ -475,8 +459,10 @@ func (c *ClusterConfig) ValidatePrivateCluster() error {
 			return errors.New("localZones cannot be used in a fully-private cluster")
 		}
 		// public access is initially enabled to allow running operations that access the Kubernetes API
-		c.VPC.ClusterEndpoints.PublicAccess = Enabled()
-		c.VPC.ClusterEndpoints.PrivateAccess = Enabled()
+		if !c.IsControlPlaneOnOutposts() {
+			c.VPC.ClusterEndpoints.PublicAccess = Enabled()
+			c.VPC.ClusterEndpoints.PrivateAccess = Enabled()
+		}
 	}
 	return nil
 }
@@ -488,7 +474,7 @@ func (c *ClusterConfig) validateKubernetesNetworkConfig() error {
 	}
 	if c.KubernetesNetworkConfig.ServiceIPv4CIDR != "" {
 		if c.IPv6Enabled() {
-			return fmt.Errorf("service ipv4 cidr is not supported with IPv6")
+			return errors.New("service IPv4 CIDR is not supported with IPv6")
 		}
 		serviceIP := c.KubernetesNetworkConfig.ServiceIPv4CIDR
 		if _, _, err := net.ParseCIDR(serviceIP); serviceIP != "" && err != nil {
@@ -776,6 +762,15 @@ func ValidateNodeGroup(i int, ng *NodeGroup, cfg *ClusterConfig) error {
 		}
 	}
 
+	if ng.AMI != "" && ng.AMIFamily == "" {
+		return errors.Errorf("when using a custom AMI, amiFamily needs to be explicitly set via config file or via --node-ami-family flag")
+	}
+
+	if ng.Bottlerocket != nil && ng.AMIFamily != NodeImageFamilyBottlerocket {
+		return fmt.Errorf(`bottlerocket config can only be used with amiFamily "Bottlerocket" but found "%s" (path=%s.bottlerocket)`,
+			ng.AMIFamily, path)
+	}
+
 	if ng.AMI != "" && ng.OverrideBootstrapCommand == nil && ng.AMIFamily != NodeImageFamilyBottlerocket && !IsWindowsImage(ng.AMIFamily) {
 		return errors.Errorf("%[1]s.overrideBootstrapCommand is required when using a custom AMI (%[1]s.ami)", path)
 	}
@@ -792,11 +787,6 @@ func ValidateNodeGroup(i int, ng *NodeGroup, cfg *ClusterConfig) error {
 		if err := validateNodeGroupSSH(ng.SSH); err != nil {
 			return err
 		}
-	}
-
-	if ng.Bottlerocket != nil && ng.AMIFamily != NodeImageFamilyBottlerocket {
-		return fmt.Errorf(`bottlerocket config can only be used with amiFamily "Bottlerocket" but found %s (path=%s.bottlerocket)`,
-			ng.AMIFamily, path)
 	}
 
 	if IsWindowsImage(ng.AMIFamily) || ng.AMIFamily == NodeImageFamilyBottlerocket {
@@ -1050,12 +1040,6 @@ func validateNodeGroupIAM(iam *NodeGroupIAM, value, fieldName, path string) erro
 // ValidateManagedNodeGroup validates a ManagedNodeGroup and sets some defaults
 func ValidateManagedNodeGroup(index int, ng *ManagedNodeGroup) error {
 	normalizeAMIFamily(ng.BaseNodeGroup())
-	switch ng.AMIFamily {
-	case NodeImageFamilyAmazonLinux2, NodeImageFamilyBottlerocket, NodeImageFamilyUbuntu1804, NodeImageFamilyUbuntu2004:
-	default:
-		return errors.Errorf("%q is not supported for managed nodegroups", ng.AMIFamily)
-	}
-
 	path := fmt.Sprintf("managedNodeGroups[%d]", index)
 
 	if err := validateNodeGroupBase(ng, path, false); err != nil {
@@ -1155,6 +1139,20 @@ func ValidateManagedNodeGroup(index int, ng *ManagedNodeGroup) error {
 		}
 	}
 
+	// Windows doesn't use overrideBootstrapCommand, as it always uses bootstrapping script that comes with Windows AMIs
+	if IsWindowsImage(ng.AMIFamily) {
+		fieldNotSupported := func(field string) error {
+			return &unsupportedFieldError{
+				ng:    ng.NodeGroupBase,
+				path:  path,
+				field: field,
+			}
+		}
+		if ng.OverrideBootstrapCommand != nil {
+			return fieldNotSupported("overrideBootstrapCommand")
+		}
+	}
+
 	if err := validateTaints(ng.Taints); err != nil {
 		return err
 	}
@@ -1193,8 +1191,11 @@ func ValidateManagedNodeGroup(index int, ng *ManagedNodeGroup) error {
 		if !IsAMI(ng.AMI) {
 			return errors.Errorf("invalid AMI %q (%s.%s)", ng.AMI, path, "ami")
 		}
+		if ng.AMIFamily == "" {
+			return errors.Errorf("when using a custom AMI, amiFamily needs to be explicitly set via config file or via --node-ami-family flag")
+		}
 		if ng.AMIFamily != NodeImageFamilyAmazonLinux2 {
-			return errors.Errorf("cannot set amiFamily to %s when using a custom AMI", ng.AMIFamily)
+			return errors.Errorf("cannot set amiFamily to %s when using a custom AMI for managed nodes, only %s is supported", ng.AMIFamily, NodeImageFamilyAmazonLinux2)
 		}
 		if ng.OverrideBootstrapCommand == nil {
 			return errors.Errorf("%s.overrideBootstrapCommand is required when using a custom AMI (%s.ami)", path, path)
@@ -1285,8 +1286,8 @@ func validateInstancesDistribution(ng *NodeGroup) error {
 	}
 
 	if distribution.SpotAllocationStrategy != nil {
-		if !isSpotAllocationStrategySupported(*distribution.SpotAllocationStrategy) {
-			return fmt.Errorf("spotAllocationStrategy should be one of: %v", strings.Join(supportedSpotAllocationStrategies(), ", "))
+		if err := validateSpotAllocationStrategy(*distribution.SpotAllocationStrategy); err != nil {
+			return err
 		}
 	}
 

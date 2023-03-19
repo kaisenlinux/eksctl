@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/pkg/errors"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
@@ -30,20 +31,18 @@ import (
 // Values for `KubernetesVersion`
 // All valid values should go in this block
 const (
-	Version1_20 = "1.20"
-
-	Version1_21 = "1.21"
-
 	Version1_22 = "1.22"
 
 	Version1_23 = "1.23"
 
 	Version1_24 = "1.24"
 
-	// DefaultVersion (default)
-	DefaultVersion = Version1_23
+	Version1_25 = "1.25"
 
-	LatestVersion = Version1_24
+	// DefaultVersion (default)
+	DefaultVersion = Version1_25
+
+	LatestVersion = Version1_25
 
 	DockershimDeprecationVersion = Version1_24
 )
@@ -79,12 +78,18 @@ const (
 
 	// Version1_19 represents Kubernetes version 1.19.x
 	Version1_19 = "1.19"
+
+	// Version1_20 represents Kubernetes version 1.20.x
+	Version1_20 = "1.20"
+
+	// Version1_21 represents Kubernetes version 1.21.x
+	Version1_21 = "1.21"
 )
 
 // Not yet supported versions
 const (
-	// Version1_25 represents Kubernetes version 1.25.x
-	Version1_25 = "1.25"
+	// Version1_26 represents Kubernetes version 1.26.x
+	Version1_26 = "1.26"
 )
 
 const (
@@ -124,8 +129,14 @@ const (
 	// RegionEUCentral1 represents the EU Central Region Frankfurt
 	RegionEUCentral1 = "eu-central-1"
 
-	// RegionEUSouth1 represents te Eu South Region Milan
+	// RegionEUCentral2 represents the EU Central Region Zurich.
+	RegionEUCentral2 = "eu-central-2"
+
+	// RegionEUSouth1 represents the Eu South Region Milan
 	RegionEUSouth1 = "eu-south-1"
+
+	// RegionEUSouth2 represents the Eu South Region Spain
+	RegionEUSouth2 = "eu-south-2"
 
 	// RegionAPNorthEast1 represents the Asia-Pacific North East Region Tokyo
 	RegionAPNorthEast1 = "ap-northeast-1"
@@ -145,8 +156,14 @@ const (
 	// RegionAPSouthEast3 represents the Asia-Pacific South East Region Jakarta
 	RegionAPSouthEast3 = "ap-southeast-3"
 
+	// RegionAPSouthEast4 represents the Asia-Pacific South East Region Melbourne
+	RegionAPSouthEast4 = "ap-southeast-4"
+
 	// RegionAPSouth1 represents the Asia-Pacific South Region Mumbai
 	RegionAPSouth1 = "ap-south-1"
+
+	// RegionAPSouth2 represents the Asia-Pacific South Region Hyderabad
+	RegionAPSouth2 = "ap-south-2"
 
 	// RegionAPEast1 represents the Asia Pacific Region Hong Kong
 	RegionAPEast1 = "ap-east-1"
@@ -316,14 +333,26 @@ const (
 	// eksResourceAccountEUSouth1 defines the AWS EKS account ID that provides node resources in eu-south-1
 	eksResourceAccountEUSouth1 = "590381155156"
 
+	// eksResourceAccountEUSouth2 defines the AWS EKS account ID that provides node resources in eu-south-2
+	eksResourceAccountEUSouth2 = "455263428931"
+
+	// eksResourceAccountEUCentral2 defines the AWS EKS account ID that provides node resources in eu-central-2.
+	eksResourceAccountEUCentral2 = "900612956339"
+
 	// eksResourceAccountUSGovWest1 defines the AWS EKS account ID that provides node resources in us-gov-west-1
 	eksResourceAccountUSGovWest1 = "013241004608"
 
 	// eksResourceAccountUSGovEast1 defines the AWS EKS account ID that provides node resources in us-gov-east-1
 	eksResourceAccountUSGovEast1 = "151742754352"
 
+	// eksResourceAccountAPSouth2 defines the AWS EKS account ID that provides node resources in ap-south-2
+	eksResourceAccountAPSouth2 = "900889452093"
+
 	// eksResourceAccountAPSouthEast3 defines the AWS EKS account ID that provides node resources in ap-southeast-3
 	eksResourceAccountAPSouthEast3 = "296578399912"
+
+	// eksResourceAccountAPSouthEast4 defines the AWS EKS account ID that provides node resources in ap-southeast-4
+	eksResourceAccountAPSouthEast4 = "491585149902"
 )
 
 // Values for `VolumeType`
@@ -445,14 +474,18 @@ func SupportedRegions() []string {
 		RegionEUWest3,
 		RegionEUNorth1,
 		RegionEUCentral1,
+		RegionEUCentral2,
 		RegionEUSouth1,
+		RegionEUSouth2,
 		RegionAPNorthEast1,
 		RegionAPNorthEast2,
 		RegionAPNorthEast3,
 		RegionAPSouthEast1,
 		RegionAPSouthEast2,
 		RegionAPSouthEast3,
+		RegionAPSouthEast4,
 		RegionAPSouth1,
+		RegionAPSouth2,
 		RegionAPEast1,
 		RegionMECentral1,
 		RegionMESouth1,
@@ -492,6 +525,8 @@ func DeprecatedVersions() []string {
 		Version1_17,
 		Version1_18,
 		Version1_19,
+		Version1_20,
+		Version1_21,
 	}
 }
 
@@ -508,11 +543,10 @@ func IsDeprecatedVersion(version string) bool {
 // SupportedVersions are the versions of Kubernetes that EKS supports
 func SupportedVersions() []string {
 	return []string{
-		Version1_20,
-		Version1_21,
 		Version1_22,
 		Version1_23,
 		Version1_24,
+		Version1_25,
 	}
 }
 
@@ -551,23 +585,15 @@ func supportedAMIFamilies() []string {
 	}
 }
 
-// supportedSpotAllocationStrategies are the spot allocation strategies supported by ASG
-func supportedSpotAllocationStrategies() []string {
-	return []string{
-		SpotAllocationStrategyLowestPrice,
-		SpotAllocationStrategyCapacityOptimized,
-		SpotAllocationStrategyCapacityOptimizedPrioritized,
-	}
-}
-
-// isSpotAllocationStrategySupported returns true if the spot allocation strategy is supported for ASG
-func isSpotAllocationStrategySupported(allocationStrategy string) bool {
-	for _, strategy := range supportedSpotAllocationStrategies() {
-		if strategy == allocationStrategy {
-			return true
+// validateSpotAllocationStrategy validates that the specified spot allocation strategy is supported.
+func validateSpotAllocationStrategy(allocationStrategy string) error {
+	var strategy ec2types.SpotAllocationStrategy
+	for _, s := range strategy.Values() {
+		if string(s) == allocationStrategy {
+			return nil
 		}
 	}
-	return false
+	return fmt.Errorf("spotAllocationStrategy should be one of: %v", strategy.Values())
 }
 
 // EKSResourceAccountID provides worker node resources(ami/ecr image) in different aws account
@@ -592,8 +618,16 @@ func EKSResourceAccountID(region string) string {
 		return eksResourceAccountAFSouth1
 	case RegionEUSouth1:
 		return eksResourceAccountEUSouth1
+	case RegionEUSouth2:
+		return eksResourceAccountEUSouth2
+	case RegionEUCentral2:
+		return eksResourceAccountEUCentral2
+	case RegionAPSouth2:
+		return eksResourceAccountAPSouth2
 	case RegionAPSouthEast3:
 		return eksResourceAccountAPSouthEast3
+	case RegionAPSouthEast4:
+		return eksResourceAccountAPSouthEast4
 	default:
 		return eksResourceAccountStandard
 	}
@@ -616,6 +650,9 @@ type ClusterMeta struct {
 	// Annotations are arbitrary metadata ignored by `eksctl`.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+	// Internal fields
+	// AccountID the ID of the account hosting this cluster
+	AccountID string `json:"-"`
 }
 
 // KubernetesNetworkConfig contains cluster networking options
@@ -867,6 +904,8 @@ type Outpost struct {
 	ControlPlaneOutpostARN string `json:"controlPlaneOutpostARN"`
 	// ControlPlaneInstanceType specifies the instance type to use for creating the control plane instances.
 	ControlPlaneInstanceType string `json:"controlPlaneInstanceType"`
+	// ControlPlanePlacement specifies the placement configuration for control plane instances on Outposts.
+	ControlPlanePlacement *Placement `json:"controlPlanePlacement,omitempty"`
 }
 
 // GetInstanceType returns the control plane instance type.
@@ -877,6 +916,11 @@ func (o *Outpost) GetInstanceType() string {
 // SetInstanceType sets the control plane instance type.
 func (o *Outpost) SetInstanceType(instanceType string) {
 	o.ControlPlaneInstanceType = instanceType
+}
+
+// HasPlacementGroup reports whether this Outpost has a placement group.
+func (o *Outpost) HasPlacementGroup() bool {
+	return o.ControlPlanePlacement != nil
 }
 
 // OutpostInfo describes the Outpost info.
@@ -1786,10 +1830,9 @@ type SecretsEncryption struct {
 	KeyARN string `json:"keyARN,omitempty"`
 }
 
-// PrivateCluster defines the configuration for a fully-private cluster
+// PrivateCluster defines the configuration for a fully-private cluster.
 type PrivateCluster struct {
-
-	// Enabled enables creation of a fully-private cluster
+	// Enabled enables creation of a fully-private cluster.
 	Enabled bool `json:"enabled"`
 
 	// SkipEndpointCreation skips the creation process for endpoints completely. This is only used in case of an already
@@ -1798,7 +1841,7 @@ type PrivateCluster struct {
 
 	// AdditionalEndpointServices specifies additional endpoint services that
 	// must be enabled for private access.
-	// Valid entries are `AdditionalEndpointServices` constants
+	// Valid entries are "cloudformation", "autoscaling" and "logs".
 	AdditionalEndpointServices []string `json:"additionalEndpointServices,omitempty"`
 }
 

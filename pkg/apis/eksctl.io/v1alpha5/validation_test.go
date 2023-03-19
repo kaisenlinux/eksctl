@@ -10,7 +10,6 @@ import (
 
 	api "github.com/weaveworks/eksctl/pkg/apis/eksctl.io/v1alpha5"
 	cft "github.com/weaveworks/eksctl/pkg/cfn/template"
-	"github.com/weaveworks/eksctl/pkg/utils/strings"
 )
 
 var _ = Describe("ClusterConfig validation", func() {
@@ -87,16 +86,19 @@ var _ = Describe("ClusterConfig validation", func() {
 			cfg := api.NewClusterConfig()
 			ng0 := cfg.NewNodeGroup()
 			ng0.Name = "node-group"
-			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeDockerForWindows)
+
+			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeContainerD)
 			err := api.ValidateNodeGroup(0, ng0, cfg)
 			Expect(err).NotTo(HaveOccurred())
 
-			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeDockerD)
+			// Docker container runtime is only supported up to K8s version 1.23
+			cfg.Metadata.Version = api.Version1_23
+
+			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeDockerForWindows)
 			err = api.ValidateNodeGroup(0, ng0, cfg)
 			Expect(err).NotTo(HaveOccurred())
 
-			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeContainerD)
-			ng0.AMIFamily = api.NodeImageFamilyAmazonLinux2
+			ng0.ContainerRuntime = aws.String(api.ContainerRuntimeDockerD)
 			err = api.ValidateNodeGroup(0, ng0, cfg)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -138,11 +140,19 @@ var _ = Describe("ClusterConfig validation", func() {
 	})
 
 	Describe("nodeGroups[*].ami validation", func() {
+		It("should require ami family if ami is set", func() {
+			cfg := api.NewClusterConfig()
+			ng0 := cfg.NewNodeGroup()
+			ng0.Name = "node-group"
+			ng0.AMI = "ami-1234"
+			Expect(api.ValidateNodeGroup(0, ng0, cfg)).To(MatchError(ContainSubstring("when using a custom AMI, amiFamily needs to be explicitly set via config file or via --node-ami-family flag")))
+		})
 		It("should require overrideBootstrapCommand if ami is set", func() {
 			cfg := api.NewClusterConfig()
 			ng0 := cfg.NewNodeGroup()
 			ng0.Name = "node-group"
 			ng0.AMI = "ami-1234"
+			ng0.AMIFamily = api.NodeImageFamilyAmazonLinux2
 			Expect(api.ValidateNodeGroup(0, ng0, cfg)).To(MatchError(ContainSubstring("overrideBootstrapCommand is required when using a custom AMI ")))
 		})
 		It("should not require overrideBootstrapCommand if ami is set and type is Bottlerocket", func() {
@@ -175,6 +185,7 @@ var _ = Describe("ClusterConfig validation", func() {
 			ng0 := cfg.NewNodeGroup()
 			ng0.Name = "node-group"
 			ng0.AMI = "ami-1234"
+			ng0.AMIFamily = api.NodeImageFamilyAmazonLinux2
 			ng0.OverrideBootstrapCommand = aws.String("echo 'yo'")
 			Expect(api.ValidateNodeGroup(0, ng0, cfg)).To(Succeed())
 		})
@@ -831,7 +842,7 @@ var _ = Describe("ClusterConfig validation", func() {
 		})
 		When("additional endpoints are defined with skip endpoints", func() {
 			It("fails the validation", func() {
-				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudFormation}
+				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudWatch.Name}
 				cfg.PrivateCluster.SkipEndpointCreation = true
 				err := api.ValidateClusterConfig(cfg)
 				Expect(err).To(MatchError(ContainSubstring("privateCluster.additionalEndpointServices cannot be set when privateCluster.skipEndpointCreation is true")))
@@ -839,7 +850,7 @@ var _ = Describe("ClusterConfig validation", func() {
 		})
 		When("additional endpoints are defined", func() {
 			It("validates the endpoint configuration", func() {
-				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudFormation}
+				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudWatch.Name}
 				err := api.ValidateClusterConfig(cfg)
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -1119,7 +1130,7 @@ var _ = Describe("ClusterConfig validation", func() {
 						cfg.KubernetesNetworkConfig.ServiceIPv4CIDR = "192.168.0.0/24"
 						cfg.VPC.NAT = nil
 						err = api.ValidateClusterConfig(cfg)
-						Expect(err).To(MatchError(ContainSubstring("service ipv4 cidr is not supported with IPv6")))
+						Expect(err).To(MatchError(ContainSubstring("service IPv4 CIDR is not supported with IPv6")))
 					})
 				})
 
@@ -1302,7 +1313,7 @@ var _ = Describe("ClusterConfig validation", func() {
 		})
 		When("additional endpoints are defined with skip endpoints", func() {
 			It("fails the validation", func() {
-				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudFormation}
+				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudWatch.Name}
 				cfg.PrivateCluster.SkipEndpointCreation = true
 				err := cfg.ValidatePrivateCluster()
 				Expect(err).To(MatchError(ContainSubstring("privateCluster.additionalEndpointServices cannot be set when privateCluster.skipEndpointCreation is true")))
@@ -1310,7 +1321,7 @@ var _ = Describe("ClusterConfig validation", func() {
 		})
 		When("additional endpoints are defined", func() {
 			It("validates the endpoint configuration", func() {
-				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudFormation}
+				cfg.PrivateCluster.AdditionalEndpointServices = []string{api.EndpointServiceCloudWatch.Name}
 				err := cfg.ValidatePrivateCluster()
 				Expect(err).NotTo(HaveOccurred())
 			})
@@ -1517,14 +1528,14 @@ var _ = Describe("ClusterConfig validation", func() {
 			})
 
 			It("fails when the spotAllocationStrategy is not a supported strategy", func() {
-				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("unsupported-strategy")
+				ng.InstancesDistribution.SpotAllocationStrategy = aws.String("unsupported-strategy")
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
-				Expect(err).To(MatchError("spotAllocationStrategy should be one of: lowest-price, capacity-optimized, capacity-optimized-prioritized"))
+				Expect(err).To(MatchError("spotAllocationStrategy should be one of: [lowest-price diversified capacity-optimized capacity-optimized-prioritized price-capacity-optimized]"))
 			})
 
 			It("fails when the spotAllocationStrategy is capacity-optimized and spotInstancePools is specified", func() {
-				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("capacity-optimized")
+				ng.InstancesDistribution.SpotAllocationStrategy = aws.String("capacity-optimized")
 				ng.InstancesDistribution.SpotInstancePools = newInt(2)
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
@@ -1532,7 +1543,7 @@ var _ = Describe("ClusterConfig validation", func() {
 			})
 
 			It("fails when the spotAllocationStrategy is capacity-optimized-prioritized and spotInstancePools is specified", func() {
-				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("capacity-optimized-prioritized")
+				ng.InstancesDistribution.SpotAllocationStrategy = aws.String("capacity-optimized-prioritized")
 				ng.InstancesDistribution.SpotInstancePools = newInt(2)
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
@@ -1540,7 +1551,7 @@ var _ = Describe("ClusterConfig validation", func() {
 			})
 
 			It("does not fail when the spotAllocationStrategy is lowest-price and spotInstancePools is specified", func() {
-				ng.InstancesDistribution.SpotAllocationStrategy = strings.Pointer("lowest-price")
+				ng.InstancesDistribution.SpotAllocationStrategy = aws.String("lowest-price")
 				ng.InstancesDistribution.SpotInstancePools = newInt(2)
 
 				err := api.ValidateNodeGroup(0, ng, cfg)
@@ -1731,6 +1742,16 @@ var _ = Describe("ClusterConfig validation", func() {
 	})
 
 	Describe("Bottlerocket node groups", func() {
+		It("returns an error if bottlerocket settings are used with incorrect amiFamily", func() {
+			ng := &api.NodeGroup{
+				NodeGroupBase: &api.NodeGroupBase{
+					Bottlerocket: &api.NodeGroupBottlerocket{},
+				},
+			}
+			err := api.ValidateNodeGroup(0, ng, api.NewClusterConfig())
+			Expect(err).To(MatchError(ContainSubstring(`bottlerocket config can only be used with amiFamily "Bottlerocket"`)))
+		})
+
 		It("returns an error with unsupported fields", func() {
 			cmd := "/usr/bin/some-command"
 			doc := api.InlineDocument{

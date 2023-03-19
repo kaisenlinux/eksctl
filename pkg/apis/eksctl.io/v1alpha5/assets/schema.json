@@ -51,13 +51,30 @@
           "description": "list of ARNs of the IAM policies to attach",
           "x-intellij-html-description": "list of ARNs of the IAM policies to attach"
         },
+        "configurationValues": {
+          "type": "string",
+          "description": "defines the set of configuration properties for add-ons. For now, all properties will be specified as a JSON string and have to respect the schema from DescribeAddonConfiguration.",
+          "x-intellij-html-description": "defines the set of configuration properties for add-ons. For now, all properties will be specified as a JSON string and have to respect the schema from DescribeAddonConfiguration."
+        },
         "name": {
           "type": "string"
+        },
+        "owners": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "permissionsBoundary": {
           "type": "string",
           "description": "ARN of the permissions' boundary to associate",
           "x-intellij-html-description": "ARN of the permissions' boundary to associate"
+        },
+        "publishers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "resolveConflicts": {
           "$ref": "#/definitions/github.com|aws|aws-sdk-go-v2|service|eks|types.ResolveConflicts",
@@ -75,6 +92,12 @@
           "description": "The metadata to apply to the cluster to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define.",
           "x-intellij-html-description": "The metadata to apply to the cluster to assist with categorization and organization. Each tag consists of a key and an optional value, both of which you define.",
           "default": "{}"
+        },
+        "types": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "version": {
           "type": "string"
@@ -94,7 +117,11 @@
         "permissionsBoundary",
         "wellKnownPolicies",
         "tags",
-        "resolveConflicts"
+        "resolveConflicts",
+        "configurationValues",
+        "publishers",
+        "types",
+        "owners"
       ],
       "additionalProperties": false,
       "description": "holds the EKS addon configuration",
@@ -551,15 +578,14 @@
         },
         "version": {
           "type": "string",
-          "description": "Valid variants are: `\"1.20\"`, `\"1.21\"`, `\"1.22\"`, `\"1.23\"` (default), `\"1.24\"`.",
-          "x-intellij-html-description": "Valid variants are: <code>&quot;1.20&quot;</code>, <code>&quot;1.21&quot;</code>, <code>&quot;1.22&quot;</code>, <code>&quot;1.23&quot;</code> (default), <code>&quot;1.24&quot;</code>.",
-          "default": "1.23",
+          "description": "Valid variants are: `\"1.22\"`, `\"1.23\"`, `\"1.24\"`, `\"1.25\"` (default).",
+          "x-intellij-html-description": "Valid variants are: <code>&quot;1.22&quot;</code>, <code>&quot;1.23&quot;</code>, <code>&quot;1.24&quot;</code>, <code>&quot;1.25&quot;</code> (default).",
+          "default": "1.25",
           "enum": [
-            "1.20",
-            "1.21",
             "1.22",
             "1.23",
-            "1.24"
+            "1.24",
+            "1.25"
           ]
         }
       },
@@ -2083,11 +2109,17 @@
           "type": "string",
           "description": "specifies the Outpost ARN in which the control plane should be created.",
           "x-intellij-html-description": "specifies the Outpost ARN in which the control plane should be created."
+        },
+        "controlPlanePlacement": {
+          "$ref": "#/definitions/Placement",
+          "description": "specifies the placement configuration for control plane instances on Outposts.",
+          "x-intellij-html-description": "specifies the placement configuration for control plane instances on Outposts."
         }
       },
       "preferredOrder": [
         "controlPlaneOutpostARN",
-        "controlPlaneInstanceType"
+        "controlPlaneInstanceType",
+        "controlPlanePlacement"
       ],
       "additionalProperties": false,
       "description": "holds the Outpost configuration.",
@@ -2110,21 +2142,16 @@
       "properties": {
         "additionalEndpointServices": {
           "items": {
-            "type": "string",
-            "enum": [
-              "cloudformation",
-              "autoscaling",
-              "logs"
-            ]
+            "type": "string"
           },
           "type": "array",
-          "description": "specifies additional endpoint services that must be enabled for private access. Valid entries are: `\"cloudformation\"`, `\"autoscaling\"`, `\"logs\"`.",
-          "x-intellij-html-description": "specifies additional endpoint services that must be enabled for private access. Valid entries are: <code>&quot;cloudformation&quot;</code>, <code>&quot;autoscaling&quot;</code>, <code>&quot;logs&quot;</code>."
+          "description": "specifies additional endpoint services that must be enabled for private access. Valid entries are \"cloudformation\", \"autoscaling\" and \"logs\".",
+          "x-intellij-html-description": "specifies additional endpoint services that must be enabled for private access. Valid entries are &quot;cloudformation&quot;, &quot;autoscaling&quot; and &quot;logs&quot;."
         },
         "enabled": {
           "type": "boolean",
-          "description": "enables creation of a fully-private cluster",
-          "x-intellij-html-description": "enables creation of a fully-private cluster",
+          "description": "enables creation of a fully-private cluster.",
+          "x-intellij-html-description": "enables creation of a fully-private cluster.",
           "default": "false"
         },
         "skipEndpointCreation": {
@@ -2140,8 +2167,8 @@
         "additionalEndpointServices"
       ],
       "additionalProperties": false,
-      "description": "defines the configuration for a fully-private cluster",
-      "x-intellij-html-description": "defines the configuration for a fully-private cluster"
+      "description": "defines the configuration for a fully-private cluster.",
+      "x-intellij-html-description": "defines the configuration for a fully-private cluster."
     },
     "SecretsEncryption": {
       "required": [

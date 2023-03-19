@@ -57,18 +57,27 @@ type ASG interface {
 	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/autoscaling-load-balancer.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	AttachLoadBalancers(ctx context.Context, params *AttachLoadBalancersInput, optFns ...func(*Options)) (*AttachLoadBalancersOutput, error)
+	// Reserved for use with Amazon VPC Lattice, which is in preview and subject to
+	// change. Do not use this API for production workloads. This API is also subject
+	// to change. Attaches one or more traffic sources to the specified Auto Scaling
+	// group. To describe the traffic sources for an Auto Scaling group, call the
+	// DescribeTrafficSources API. To detach a traffic source from the Auto Scaling
+	// group, call the DetachTrafficSources API. This operation is additive and does
+	// not detach existing traffic sources from the Auto Scaling group.
+	AttachTrafficSources(ctx context.Context, params *AttachTrafficSourcesInput, optFns ...func(*Options)) (*AttachTrafficSourcesOutput, error)
 	// Deletes one or more scheduled actions for the specified Auto Scaling group.
 	BatchDeleteScheduledAction(ctx context.Context, params *BatchDeleteScheduledActionInput, optFns ...func(*Options)) (*BatchDeleteScheduledActionOutput, error)
 	// Creates or updates one or more scheduled scaling actions for an Auto Scaling
 	// group.
 	BatchPutScheduledUpdateGroupAction(ctx context.Context, params *BatchPutScheduledUpdateGroupActionInput, optFns ...func(*Options)) (*BatchPutScheduledUpdateGroupActionOutput, error)
-	// Cancels an instance refresh operation in progress. Cancellation does not roll
-	// back any replacements that have already been completed, but it prevents new
-	// replacements from being started. This operation is part of the instance refresh
-	// feature
+	// Cancels an instance refresh or rollback that is in progress. If an instance
+	// refresh or rollback is not in progress, an ActiveInstanceRefreshNotFound error
+	// occurs. This operation is part of the instance refresh feature
 	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/asg-instance-refresh.html)
 	// in Amazon EC2 Auto Scaling, which helps you update instances in your Auto
-	// Scaling group after you make configuration changes.
+	// Scaling group after you make configuration changes. When you cancel an instance
+	// refresh, this does not roll back any changes that it made. Use the
+	// RollbackInstanceRefresh API to roll back instead.
 	CancelInstanceRefresh(ctx context.Context, params *CancelInstanceRefreshInput, optFns ...func(*Options)) (*CancelInstanceRefreshOutput, error)
 	// Completes the lifecycle action for the specified token or instance with the
 	// specified result. This step is a part of the procedure for adding a lifecycle
@@ -225,30 +234,13 @@ type ASG interface {
 	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/asg-instance-refresh.html)
 	// in Amazon EC2 Auto Scaling, which helps you update instances in your Auto
 	// Scaling group after you make configuration changes. To help you determine the
-	// status of an instance refresh, this operation returns information about the
-	// instance refreshes you previously initiated, including their status, end time,
-	// the percentage of the instance refresh that is complete, and the number of
-	// instances remaining to update before the instance refresh is complete. The
-	// following are the possible statuses:
-	//
-	// * Pending - The request was created, but
-	// the operation has not started.
-	//
-	// * InProgress - The operation is in progress.
-	//
-	// *
-	// Successful - The operation completed successfully.
-	//
-	// * Failed - The operation
-	// failed to complete. You can troubleshoot using the status reason and the scaling
-	// activities.
-	//
-	// * Cancelling - An ongoing operation is being cancelled.
-	// Cancellation does not roll back any replacements that have already been
-	// completed, but it prevents new replacements from being started.
-	//
-	// * Cancelled -
-	// The operation is cancelled.
+	// status of an instance refresh, Amazon EC2 Auto Scaling returns information about
+	// the instance refreshes you previously initiated, including their status, start
+	// time, end time, the percentage of the instance refresh that is complete, and the
+	// number of instances remaining to update before the instance refresh is complete.
+	// If a rollback is initiated while an instance refresh is in progress, Amazon EC2
+	// Auto Scaling also returns information about the rollback of the instance
+	// refresh.
 	DescribeInstanceRefreshes(ctx context.Context, params *DescribeInstanceRefreshesInput, optFns ...func(*Options)) (*DescribeInstanceRefreshesOutput, error)
 	// Gets information about the launch configurations in the account and Region.
 	DescribeLaunchConfigurations(ctx context.Context, params *DescribeLaunchConfigurationsInput, optFns ...func(*Options)) (*DescribeLaunchConfigurationsOutput, error)
@@ -283,7 +275,10 @@ type ASG interface {
 	// Load Balancing to distribute traffic across the instances in your Auto Scaling
 	// group
 	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/autoscaling-load-balancer.html)
-	// in the Amazon EC2 Auto Scaling User Guide.
+	// in the Amazon EC2 Auto Scaling User Guide. You can use this operation to
+	// describe target groups that were attached by using
+	// AttachLoadBalancerTargetGroups, but not for target groups that were attached by
+	// using AttachTrafficSources.
 	DescribeLoadBalancerTargetGroups(ctx context.Context, params *DescribeLoadBalancerTargetGroupsInput, optFns ...func(*Options)) (*DescribeLoadBalancerTargetGroupsOutput, error)
 	// Gets information about the load balancers for the specified Auto Scaling group.
 	// This operation describes only Classic Load Balancers. If you have Application
@@ -352,6 +347,11 @@ type ASG interface {
 	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-termination-policies.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	DescribeTerminationPolicyTypes(ctx context.Context, params *DescribeTerminationPolicyTypesInput, optFns ...func(*Options)) (*DescribeTerminationPolicyTypesOutput, error)
+	// Reserved for use with Amazon VPC Lattice, which is in preview and subject to
+	// change. Do not use this API for production workloads. This API is also subject
+	// to change. Gets information about the traffic sources for the specified Auto
+	// Scaling group.
+	DescribeTrafficSources(ctx context.Context, params *DescribeTrafficSourcesInput, optFns ...func(*Options)) (*DescribeTrafficSourcesOutput, error)
 	// Gets information about a warm pool and its instances. For more information, see
 	// Warm pools for Amazon EC2 Auto Scaling
 	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-warm-pools.html)
@@ -373,7 +373,9 @@ type ASG interface {
 	// you detach a target group, it enters the Removing state while deregistering the
 	// instances in the group. When all instances are deregistered, then you can no
 	// longer describe the target group using the DescribeLoadBalancerTargetGroups API
-	// call. The instances remain running.
+	// call. The instances remain running. You can use this operation to detach target
+	// groups that were attached by using AttachLoadBalancerTargetGroups, but not for
+	// target groups that were attached by using AttachTrafficSources.
 	DetachLoadBalancerTargetGroups(ctx context.Context, params *DetachLoadBalancerTargetGroupsInput, optFns ...func(*Options)) (*DetachLoadBalancerTargetGroupsOutput, error)
 	// Detaches one or more Classic Load Balancers from the specified Auto Scaling
 	// group. This operation detaches only Classic Load Balancers. If you have
@@ -384,6 +386,11 @@ type ASG interface {
 	// load balancer using the DescribeLoadBalancers API call. The instances remain
 	// running.
 	DetachLoadBalancers(ctx context.Context, params *DetachLoadBalancersInput, optFns ...func(*Options)) (*DetachLoadBalancersOutput, error)
+	// Reserved for use with Amazon VPC Lattice, which is in preview and subject to
+	// change. Do not use this API for production workloads. This API is also subject
+	// to change. Detaches one or more traffic sources from the specified Auto Scaling
+	// group.
+	DetachTrafficSources(ctx context.Context, params *DetachTrafficSourcesInput, optFns ...func(*Options)) (*DetachTrafficSourcesOutput, error)
 	// Disables group metrics collection for the specified Auto Scaling group.
 	DisableMetricsCollection(ctx context.Context, params *DisableMetricsCollectionInput, optFns ...func(*Options)) (*DisableMetricsCollectionOutput, error)
 	// Enables group metrics collection for the specified Auto Scaling group. You can
@@ -549,6 +556,31 @@ type ASG interface {
 	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-suspend-resume-processes.html)
 	// in the Amazon EC2 Auto Scaling User Guide.
 	ResumeProcesses(ctx context.Context, params *ResumeProcessesInput, optFns ...func(*Options)) (*ResumeProcessesOutput, error)
+	// Cancels an instance refresh that is in progress and rolls back any changes that
+	// it made. Amazon EC2 Auto Scaling replaces any instances that were replaced
+	// during the instance refresh. This restores your Auto Scaling group to the
+	// configuration that it was using before the start of the instance refresh. This
+	// operation is part of the instance refresh feature
+	// (https://docs.aws.amazon.com/autoscaling/ec2/userguide/asg-instance-refresh.html)
+	// in Amazon EC2 Auto Scaling, which helps you update instances in your Auto
+	// Scaling group after you make configuration changes. A rollback is not supported
+	// in the following situations:
+	//
+	// * There is no desired configuration specified for
+	// the instance refresh.
+	//
+	// * The Auto Scaling group has a launch template that uses
+	// an Amazon Web Services Systems Manager parameter instead of an AMI ID for the
+	// ImageId property.
+	//
+	// * The Auto Scaling group uses the launch template's $Latest
+	// or $Default version.
+	//
+	// When you receive a successful response from this
+	// operation, Amazon EC2 Auto Scaling immediately begins replacing instances. You
+	// can check the status of this operation through the DescribeInstanceRefreshes API
+	// operation.
+	RollbackInstanceRefresh(ctx context.Context, params *RollbackInstanceRefreshInput, optFns ...func(*Options)) (*RollbackInstanceRefreshOutput, error)
 	// Sets the size of the specified Auto Scaling group. If a scale-in activity occurs
 	// as a result of a new DesiredCapacity value that is lower than the current size
 	// of the group, the Auto Scaling group uses its termination policy to determine
@@ -569,8 +601,8 @@ type ASG interface {
 	// in the Amazon EC2 Auto Scaling User Guide. If you exceed your maximum limit of
 	// instance IDs, which is 50 per Auto Scaling group, the call fails.
 	SetInstanceProtection(ctx context.Context, params *SetInstanceProtectionInput, optFns ...func(*Options)) (*SetInstanceProtectionOutput, error)
-	// Starts a new instance refresh operation. An instance refresh performs a rolling
-	// replacement of all or some instances in an Auto Scaling group. Each instance is
+	// Starts an instance refresh. During an instance refresh, Amazon EC2 Auto Scaling
+	// performs a rolling update of instances in an Auto Scaling group. Instances are
 	// terminated first and then replaced, which temporarily reduces the capacity
 	// available within your Auto Scaling group. This operation is part of the instance
 	// refresh feature
@@ -579,12 +611,22 @@ type ASG interface {
 	// Scaling group. This feature is helpful, for example, when you have a new AMI or
 	// a new user data script. You just need to create a new launch template that
 	// specifies the new AMI or user data script. Then start an instance refresh to
-	// immediately begin the process of updating instances in the group. If the call
-	// succeeds, it creates a new instance refresh request with a unique ID that you
-	// can use to track its progress. To query its status, call the
+	// immediately begin the process of updating instances in the group. If successful,
+	// the request's response contains a unique ID that you can use to track the
+	// progress of the instance refresh. To query its status, call the
 	// DescribeInstanceRefreshes API. To describe the instance refreshes that have
 	// already run, call the DescribeInstanceRefreshes API. To cancel an instance
-	// refresh operation in progress, use the CancelInstanceRefresh API.
+	// refresh that is in progress, use the CancelInstanceRefresh API. An instance
+	// refresh might fail for several reasons, such as EC2 launch failures,
+	// misconfigured health checks, or not ignoring or allowing the termination of
+	// instances that are in Standby state or protected from scale in. You can monitor
+	// for failed EC2 launches using the scaling activities. To find the scaling
+	// activities, call the DescribeScalingActivities API. If you enable auto rollback,
+	// your Auto Scaling group will be rolled back automatically when the instance
+	// refresh fails. You can enable this feature before starting an instance refresh
+	// by specifying the AutoRollback property in the instance refresh preferences.
+	// Otherwise, to roll back an instance refresh before it finishes, use the
+	// RollbackInstanceRefresh API.
 	StartInstanceRefresh(ctx context.Context, params *StartInstanceRefreshInput, optFns ...func(*Options)) (*StartInstanceRefreshOutput, error)
 	// Suspends the specified auto scaling processes, or all processes, for the
 	// specified Auto Scaling group. If you suspend either the Launch or Terminate
