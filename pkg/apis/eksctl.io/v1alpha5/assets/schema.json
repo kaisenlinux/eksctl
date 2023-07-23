@@ -578,15 +578,16 @@
         },
         "version": {
           "type": "string",
-          "description": "Valid variants are: `\"1.22\"`, `\"1.23\"`, `\"1.24\"`, `\"1.25\"` (default), `\"1.26\"`.",
-          "x-intellij-html-description": "Valid variants are: <code>&quot;1.22&quot;</code>, <code>&quot;1.23&quot;</code>, <code>&quot;1.24&quot;</code>, <code>&quot;1.25&quot;</code> (default), <code>&quot;1.26&quot;</code>.",
+          "description": "Valid variants are: `\"1.22\"`, `\"1.23\"`, `\"1.24\"`, `\"1.25\"` (default), `\"1.26\"`, `\"1.27\"`.",
+          "x-intellij-html-description": "Valid variants are: <code>&quot;1.22&quot;</code>, <code>&quot;1.23&quot;</code>, <code>&quot;1.24&quot;</code>, <code>&quot;1.25&quot;</code> (default), <code>&quot;1.26&quot;</code>, <code>&quot;1.27&quot;</code>.",
           "default": "1.25",
           "enum": [
             "1.22",
             "1.23",
             "1.24",
             "1.25",
-            "1.26"
+            "1.26",
+            "1.27"
           ]
         }
       },
@@ -670,6 +671,11 @@
           "description": "for additional IPv6 CIDR associations, e.g. a CIDR for private subnets or any ad-hoc subnets",
           "x-intellij-html-description": "for additional IPv6 CIDR associations, e.g. a CIDR for private subnets or any ad-hoc subnets"
         },
+        "hostnameType": {
+          "type": "string",
+          "description": "type of hostname to use for EC2 instances.",
+          "x-intellij-html-description": "type of hostname to use for EC2 instances."
+        },
         "id": {
           "type": "string"
         },
@@ -719,6 +725,7 @@
         "ipv6Pool",
         "securityGroup",
         "subnets",
+        "hostnameType",
         "extraCIDRs",
         "extraIPv6CIDRs",
         "sharedNodeSecurityGroup",
@@ -926,8 +933,8 @@
           "$ref": "#/definitions/OIDCIdentityProvider"
         }
       ],
-      "description": "holds an identity provider configuration. See [the example eksctl config](https://github.com/weaveworks/eksctl/blob/main/examples/27-oidc-provider.yaml).",
-      "x-intellij-html-description": "holds an identity provider configuration. See <a href=\"https://github.com/weaveworks/eksctl/blob/main/examples/27-oidc-provider.yaml\">the example eksctl config</a>."
+      "description": "holds an identity provider configuration. See [the example eksctl config](https://github.com/eksctl-io/eksctl/blob/main/examples/27-oidc-provider.yaml).",
+      "x-intellij-html-description": "holds an identity provider configuration. See <a href=\"https://github.com/eksctl-io/eksctl/blob/main/examples/27-oidc-provider.yaml\">the example eksctl config</a>."
     },
     "InlineDocument": {
       "additionalProperties": {},
@@ -1124,7 +1131,7 @@
           "type": "boolean",
           "description": "requires requests to the metadata service to use IMDSv2 tokens",
           "x-intellij-html-description": "requires requests to the metadata service to use IMDSv2 tokens",
-          "default": false
+          "default": true
         },
         "disablePodIMDS": {
           "type": "boolean",
@@ -1485,7 +1492,7 @@
           "type": "boolean",
           "description": "requires requests to the metadata service to use IMDSv2 tokens",
           "x-intellij-html-description": "requires requests to the metadata service to use IMDSv2 tokens",
-          "default": false
+          "default": true
         },
         "disablePodIMDS": {
           "type": "boolean",

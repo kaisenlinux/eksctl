@@ -10,6 +10,7 @@ gocache := $(shell go env GOCACHE)
 export GOBIN ?= $(gopath)/bin
 
 AWS_SDK_GO_DIR ?= $(shell go list -m -f '{{.Dir}}' 'github.com/aws/aws-sdk-go')
+AWS_SDK_V2_GO_DIR ?= $(shell go list -m -f '{{.Dir}}' 'github.com/aws/aws-sdk-go-v2')
 
 generated_code_deep_copy_helper := pkg/apis/eksctl.io/v1alpha5/zz_generated.deepcopy.go
 
@@ -143,7 +144,7 @@ generate-always: pkg/addons/default/assets/aws-node.yaml ## Generate code (requi
 	go generate ./pkg/authconfigmap
 	go generate ./pkg/awsapi/...
 	go generate ./pkg/eks
-	go generate ./pkg/eks/mocksv2
+	${GOBIN}/mockery
 	go generate ./pkg/drain
 	go generate ./pkg/actions/...
 	go generate ./pkg/executor
@@ -171,6 +172,7 @@ $(generated_code_deep_copy_helper): $(deep_copy_helper_input) ## Generate Kuber
 
 $(generated_code_aws_sdk_mocks): $(call godeps,pkg/eks/mocks/mocks.go) ## Generate AWS SDK mocks
 	AWS_SDK_GO_DIR=$(AWS_SDK_GO_DIR) go generate ./pkg/eks/mocks
+
 
 .PHONY: generate-kube-reserved
 generate-kube-reserved: ## Update instance list with respective specs

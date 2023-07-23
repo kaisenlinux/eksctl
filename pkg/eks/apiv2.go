@@ -28,12 +28,11 @@ import (
 	"github.com/weaveworks/eksctl/pkg/version"
 )
 
-func newV2Config(pc *api.ProviderConfig, region string, credentialsCacheFilePath string) (aws.Config, error) {
+func newV2Config(pc *api.ProviderConfig, credentialsCacheFilePath string) (aws.Config, error) {
 	var options []func(options *config.LoadOptions) error
 
-	// TODO default region
-	if region != "" {
-		options = append(options, config.WithRegion(region))
+	if pc.Region != "" {
+		options = append(options, config.WithRegion(pc.Region))
 	}
 	clientLogMode := aws.ClientLogMode(1)
 
@@ -67,7 +66,6 @@ func newV2Config(pc *api.ProviderConfig, region string, credentialsCacheFilePath
 		return cfg, err
 	}
 	if credentialsCacheFilePath != "" {
-		// TODO: extract the underlying CredentialsProvider from cfg.Credentials and use it.
 		fileCache, err := credentials.NewFileCacheV2(cfg.Credentials, pc.Profile.Name, afero.NewOsFs(), func(path string) credentials.Flock {
 			return flock.New(path)
 		}, &credentials.RealClock{}, credentialsCacheFilePath)
