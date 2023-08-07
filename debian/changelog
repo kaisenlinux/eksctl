@@ -1,3 +1,11 @@
+eksctl (0.151.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import the 0.151.0 version
+  * Update the quilt patch
+  * Remove golang-go as package dependancy
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Mon, 07 Aug 2023 13:34:43 +0100
+
 eksctl (0.150.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import the 0.150.0 version

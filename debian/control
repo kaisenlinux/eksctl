@@ -17,5 +17,4 @@ Package: eksctl
 Architecture: amd64 arm64
 Depends: ${shlibs:Depends},
 	 ${misc:Depends},
-	 golang-go (>= 1.18)
 Description: The official CLI for Amazon EKS
