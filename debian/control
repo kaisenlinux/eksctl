@@ -6,12 +6,12 @@ Build-Depends: debhelper-compat (= 13),
 	       golang-go (>= 1.18),
 	       dh-golang,
 	       mkdocs,
-Standards-Version: 4.6.0
+Standards-Version: 4.6.2
 Homepage: https://eksctl.io/
 Vcs-Browser: https://gitlab.com/kaisenlinux/packages/eksctl
 Vcs-Git: https://gitlab.com/kaisenlinux/packages/eksctl.git
 Rules-Requires-Root: no
-XS-Go-Import-Path: github.com/weaveworks/eksctl
+XS-Go-Import-Path: github.com/eksctl-io/eksctl
 
 Package: eksctl
 Architecture: amd64 arm64

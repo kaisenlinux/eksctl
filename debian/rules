@@ -3,22 +3,20 @@
 export GOPATH=$(CURDIR)/_build
 
 %:
-	dh $@ --buildsystem=golang
+	dh $@ --buildsystem=golang --builddirectory=_build
 
 override_dh_auto_clean:
 	rm -rf $(CURDIR)/_build
 
 override_dh_auto_build:
 	make binary
-	#Create bash completion
-	mkdir completions
-	./eksctl completion bash > completions/eksctl
-	# Create zsh completion
-	./eksctl completion zsh > completions/_eksctl
 
 override_dh_auto_test:
 
-override_dh_dwz:
-
 override_dh_auto_install:
-	dh_auto_install -- --no-source
+	install -p -m 0644 $(CURDIR)/debian/eksctl.png $(CURDIR)/debian/eksctl/usr/share/pixmaps
+	install -p -m 0755 $(CURDIR)/eksctl $(CURDIR)/debian/eksctl/usr/bin
+	$(CURDIR)/debian/eksctl/usr/bin/eksctl completion bash > $(CURDIR)/debian/eksctl/usr/share/bash-completion/completions/eksctl
+	$(CURDIR)/debian/eksctl/usr/bin/eksctl completion zsh > $(CURDIR)/debian/eksctl/usr/share/zsh/vendor-completions/_eksctl
+
+override_dh_dwz:

@@ -39,10 +39,12 @@ const (
 
 	Version1_27 = "1.27"
 
-	// DefaultVersion (default)
-	DefaultVersion = Version1_25
+	Version1_28 = "1.28"
 
-	LatestVersion = Version1_27
+	// DefaultVersion (default)
+	DefaultVersion = Version1_27
+
+	LatestVersion = Version1_28
 
 	DockershimDeprecationVersion = Version1_24
 )
@@ -91,8 +93,8 @@ const (
 
 // Not yet supported versions
 const (
-	// Version1_28 represents Kubernetes version 1.28.x
-	Version1_28 = "1.28"
+	// Version1_29 represents Kubernetes version 1.29.x
+	Version1_29 = "1.29"
 )
 
 const (
@@ -189,6 +191,9 @@ const (
 	// RegionCNNorth1 represents the China region Beijing
 	RegionCNNorth1 = "cn-north-1"
 
+	// RegionILCentral1 represents the Israel region Tel Aviv
+	RegionILCentral1 = "il-central-1"
+
 	// RegionUSGovWest1 represents the region GovCloud (US-West)
 	RegionUSGovWest1 = "us-gov-west-1"
 
@@ -201,18 +206,12 @@ const (
 	// RegionUSISOBEast1 represents the region US ISOB East (Ohio).
 	RegionUSISOBEast1 = "us-isob-east-1"
 
+	// RegionUSISOWest1 represents the region US ISOB West.
+	RegionUSISOWest1 = "us-iso-west-1"
+
 	// DefaultRegion defines the default region, where to deploy the EKS cluster
 	DefaultRegion = RegionUSWest2
 )
-
-func defaultVolumeTypeForRegion(region string) string {
-	switch region {
-	case RegionUSISOEast1, RegionUSISOBEast1:
-		return NodeVolumeTypeIO1
-	default:
-		return DefaultNodeVolumeType
-	}
-}
 
 // Values for `NodeAMIFamily`
 // All valid values of supported families should go in this block
@@ -362,6 +361,9 @@ const (
 	// eksResourceAccountAPSouthEast3 defines the AWS EKS account ID that provides node resources in ap-southeast-3
 	eksResourceAccountAPSouthEast3 = "296578399912"
 
+	// eksResourceAccountILCentral1 defines the AWS EKS account ID that provides node resources in il-central-1
+	eksResourceAccountILCentral1 = "066635153087"
+
 	// eksResourceAccountAPSouthEast4 defines the AWS EKS account ID that provides node resources in ap-southeast-4
 	eksResourceAccountAPSouthEast4 = "491585149902"
 	// eksResourceAccountUSISOEast1 defines the AWS EKS account ID that provides node resources in us-iso-east-1
@@ -369,6 +371,9 @@ const (
 
 	// eksResourceAccountUSISOBEast1 defines the AWS EKS account ID that provides node resources in us-isob-east-1
 	eksResourceAccountUSISOBEast1 = "187977181151"
+
+	// eksResourceAccountUSISOWest1 defines the AWS EKS account ID that provides node resources in us-iso-west-1
+	eksResourceAccountUSISOWest1 = "608367168043"
 )
 
 // Values for `VolumeType`
@@ -418,6 +423,7 @@ const (
 	KubeProxyAddon              = "kube-proxy"
 	CoreDNSAddon                = "coredns"
 	AWSEBSCSIDriverAddon        = "aws-ebs-csi-driver"
+	AWSEFSCSIDriverAddon        = "aws-efs-csi-driver"
 )
 
 // supported version of Karpenter
@@ -509,10 +515,12 @@ func SupportedRegions() []string {
 		RegionAFSouth1,
 		RegionCNNorthwest1,
 		RegionCNNorth1,
+		RegionILCentral1,
 		RegionUSGovWest1,
 		RegionUSGovEast1,
 		RegionUSISOEast1,
 		RegionUSISOBEast1,
+		RegionUSISOWest1,
 	}
 }
 
@@ -555,6 +563,7 @@ func SupportedVersions() []string {
 		Version1_25,
 		Version1_26,
 		Version1_27,
+		Version1_28,
 	}
 }
 
@@ -636,10 +645,14 @@ func EKSResourceAccountID(region string) string {
 		return eksResourceAccountAPSouthEast3
 	case RegionAPSouthEast4:
 		return eksResourceAccountAPSouthEast4
+	case RegionILCentral1:
+		return eksResourceAccountILCentral1
 	case RegionUSISOEast1:
 		return eksResourceAccountUSISOEast1
 	case RegionUSISOBEast1:
 		return eksResourceAccountUSISOBEast1
+	case RegionUSISOWest1:
+		return eksResourceAccountUSISOWest1
 	default:
 		return eksResourceAccountStandard
 	}
