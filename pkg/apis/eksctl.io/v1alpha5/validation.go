@@ -7,22 +7,22 @@ import (
 	"strconv"
 	"strings"
 
-	instanceutils "github.com/weaveworks/eksctl/pkg/utils/instance"
-
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+
 	"github.com/hashicorp/go-version"
 	"github.com/kris-nova/logger"
 	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/weaveworks/eksctl/pkg/utils"
-	"github.com/weaveworks/eksctl/pkg/utils/taints"
-
 	"k8s.io/apimachinery/pkg/util/validation"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+
+	"github.com/weaveworks/eksctl/pkg/utils"
+	instanceutils "github.com/weaveworks/eksctl/pkg/utils/instance"
+	"github.com/weaveworks/eksctl/pkg/utils/taints"
 )
 
 // https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-launchtemplate-blockdevicemapping-ebs.html
@@ -48,6 +48,10 @@ var (
 		"updates to some AWS resources.  See: " +
 		"https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html " +
 		"for more details")
+
+	ErrPodIdentityAgentNotInstalled = func(suggestion string) error {
+		return fmt.Errorf("the %q addon must be installed to create pod identity associations; %s", PodIdentityAgentAddon, suggestion)
+	}
 )
 
 // NOTE: we don't use k8s.io/apimachinery/pkg/util/sets here to keep API package free of dependencies
@@ -198,6 +202,17 @@ func ValidateClusterConfig(cfg *ClusterConfig) error {
 
 	if err := validateIAMIdentityMappings(cfg); err != nil {
 		return err
+	}
+
+	if len(cfg.AccessConfig.AccessEntries) > 0 {
+		switch cfg.AccessConfig.AuthenticationMode {
+		case ekstypes.AuthenticationModeConfigMap:
+			return fmt.Errorf("accessConfig.authenticationMode must be set to either %s or %s to use access entries",
+				ekstypes.AuthenticationModeApiAndConfigMap, ekstypes.AuthenticationModeApi)
+		}
+		if err := validateAccessEntries(cfg.AccessConfig.AccessEntries); err != nil {
+			return err
+		}
 	}
 
 	if err := validateKarpenterConfig(cfg); err != nil {
@@ -1215,8 +1230,8 @@ func ValidateManagedNodeGroup(index int, ng *ManagedNodeGroup) error {
 		if ng.AMIFamily == "" {
 			return errors.Errorf("when using a custom AMI, amiFamily needs to be explicitly set via config file or via --node-ami-family flag")
 		}
-		if ng.AMIFamily != NodeImageFamilyAmazonLinux2 && ng.AMIFamily != NodeImageFamilyUbuntu1804 && ng.AMIFamily != NodeImageFamilyUbuntu2004 {
-			return errors.Errorf("cannot set amiFamily to %s when using a custom AMI for managed nodes, only %s, %s and %s are supported", ng.AMIFamily, NodeImageFamilyAmazonLinux2, NodeImageFamilyUbuntu1804, NodeImageFamilyUbuntu2004)
+		if ng.AMIFamily != NodeImageFamilyAmazonLinux2 && ng.AMIFamily != NodeImageFamilyUbuntu1804 && ng.AMIFamily != NodeImageFamilyUbuntu2004 && ng.AMIFamily != NodeImageFamilyUbuntu2204 {
+			return errors.Errorf("cannot set amiFamily to %s when using a custom AMI for managed nodes, only %s, %s, %s and %s are supported", ng.AMIFamily, NodeImageFamilyAmazonLinux2, NodeImageFamilyUbuntu1804, NodeImageFamilyUbuntu2004, NodeImageFamilyUbuntu2204)
 		}
 		if ng.OverrideBootstrapCommand == nil {
 			return errors.Errorf("%[1]s.overrideBootstrapCommand is required when using a custom AMI based on %s (%[1]s.ami)", path, ng.AMIFamily)

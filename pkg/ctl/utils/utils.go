@@ -12,6 +12,7 @@ func Command(flagGrouping *cmdutils.FlagGrouping) *cobra.Command {
 
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, writeKubeconfigCmd)
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, describeStacksCmd)
+	cmdutils.AddResourceCmd(flagGrouping, verbCmd, updateAuthenticationMode)
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, updateKubeProxyCmd)
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, updateAWSNodeCmd)
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, updateCoreDNSCmd)
@@ -27,6 +28,7 @@ func Command(flagGrouping *cmdutils.FlagGrouping) *cobra.Command {
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, nodeGroupHealthCmd)
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, describeAddonVersionsCmd)
 	cmdutils.AddResourceCmd(flagGrouping, verbCmd, describeAddonConfigurationCmd)
+	cmdutils.AddResourceCmd(flagGrouping, verbCmd, migrateToPodIdentityCmd)
 
 	return verbCmd
 }

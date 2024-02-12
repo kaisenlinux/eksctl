@@ -3,7 +3,7 @@ Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 --- eksctl-0.164.0.orig/pkg/version/release.go
 +++ eksctl-0.164.0/pkg/version/release.go
 @@ -6,7 +6,7 @@ package version
- var Version = "0.164.0"
+ var Version = "0.171.0"
  
  // PreReleaseID can be empty for releases, "rc.X" for release candidates and "dev" for snapshots
 -var PreReleaseID = "dev"
