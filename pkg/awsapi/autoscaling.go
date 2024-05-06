@@ -120,11 +120,9 @@ type ASG interface {
 	// maximum limit of Auto Scaling groups, the call fails. To query this limit, call
 	// the DescribeAccountLimits API. For information about updating this limit, see
 	// Quotas for Amazon EC2 Auto Scaling (https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-quotas.html)
-	// in the Amazon EC2 Auto Scaling User Guide. For introductory exercises for
-	// creating an Auto Scaling group, see Getting started with Amazon EC2 Auto Scaling (https://docs.aws.amazon.com/autoscaling/ec2/userguide/GettingStartedTutorial.html)
-	// and Tutorial: Set up a scaled and load-balanced application (https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-register-lbs-with-asg.html)
-	// in the Amazon EC2 Auto Scaling User Guide. For more information, see Auto
-	// Scaling groups (https://docs.aws.amazon.com/autoscaling/ec2/userguide/AutoScalingGroup.html)
+	// in the Amazon EC2 Auto Scaling User Guide. If you're new to Amazon EC2 Auto
+	// Scaling, see the introductory tutorials in Get started with Amazon EC2 Auto
+	// Scaling (https://docs.aws.amazon.com/autoscaling/ec2/userguide/get-started-with-ec2-auto-scaling.html)
 	// in the Amazon EC2 Auto Scaling User Guide. Every Auto Scaling group has three
 	// size properties ( DesiredCapacity , MaxSize , and MinSize ). Usually, you set
 	// these sizes based on a specific number of instances. However, if you configure a
@@ -217,7 +215,8 @@ type ASG interface {
 	// Describes the notification types that are supported by Amazon EC2 Auto Scaling.
 	DescribeAutoScalingNotificationTypes(ctx context.Context, params *DescribeAutoScalingNotificationTypesInput, optFns ...func(*Options)) (*DescribeAutoScalingNotificationTypesOutput, error)
 	// Gets information about the instance refreshes for the specified Auto Scaling
-	// group. This operation is part of the instance refresh feature (https://docs.aws.amazon.com/autoscaling/ec2/userguide/asg-instance-refresh.html)
+	// group from the previous six weeks. This operation is part of the instance
+	// refresh feature (https://docs.aws.amazon.com/autoscaling/ec2/userguide/asg-instance-refresh.html)
 	// in Amazon EC2 Auto Scaling, which helps you update instances in your Auto
 	// Scaling group after you make configuration changes. To help you determine the
 	// status of an instance refresh, Amazon EC2 Auto Scaling returns information about

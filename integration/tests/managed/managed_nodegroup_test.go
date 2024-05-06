@@ -70,6 +70,7 @@ var _ = Describe("(Integration) Create Managed Nodegroups", func() {
 
 	const (
 		updateConfigNodegroup    = "ng-update-config"
+		al2023Nodegroup          = "ng-al2023"
 		bottlerocketNodegroup    = "ng-bottlerocket"
 		bottlerocketGPUNodegroup = "ng-bottlerocket-gpu"
 		ubuntuNodegroup          = "ng-ubuntu"
@@ -302,6 +303,32 @@ var _ = Describe("(Integration) Create Managed Nodegroups", func() {
 			checkNg(bottlerocketGPUNodegroup)
 		})
 
+		It("supports AmazonLinux2023 nodegroups", func() {
+			clusterConfig := makeClusterConfig()
+			clusterConfig.ManagedNodeGroups = []*api.ManagedNodeGroup{
+				{
+					NodeGroupBase: &api.NodeGroupBase{
+						Name:      al2023Nodegroup,
+						AMIFamily: "AmazonLinux2023",
+					},
+				},
+			}
+
+			By("creating it")
+			Expect(params.EksctlCreateCmd.
+				WithArgs(
+					"nodegroup",
+					"--config-file", "-",
+					"--verbose", "4",
+				).
+				WithoutArg("--region", params.Region).
+				WithStdin(clusterutils.Reader(clusterConfig))).
+				To(RunSuccessfully())
+
+			By("ensuring it is healthy")
+			checkNg(al2023Nodegroup)
+		})
+
 		It("supports bottlerocket and ubuntu nodegroups with additional volumes", func() {
 			clusterConfig := makeClusterConfig()
 			clusterConfig.ManagedNodeGroups = []*api.ManagedNodeGroup{
@@ -338,7 +365,7 @@ var _ = Describe("(Integration) Create Managed Nodegroups", func() {
 					NodeGroupBase: &api.NodeGroupBase{
 						Name:         ubuntuNodegroup,
 						VolumeSize:   aws.Int(25),
-						AMIFamily:    "Ubuntu2004",
+						AMIFamily:    "Ubuntu2204",
 						InstanceType: "t3a.xlarge",
 					},
 				},

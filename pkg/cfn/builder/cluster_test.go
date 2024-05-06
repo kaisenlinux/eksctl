@@ -76,8 +76,8 @@ var _ = Describe("Cluster Template Builder", func() {
 			controlPlane := clusterTemplate.Resources["ControlPlane"].Properties
 			Expect(controlPlane.Name).To(Equal(cfg.Metadata.Name))
 			Expect(controlPlane.Version).To(Equal(cfg.Metadata.Version))
-			Expect(controlPlane.ResourcesVpcConfig.SecurityGroupIds[0]).To(ContainElement("ControlPlaneSecurityGroup"))
-			Expect(controlPlane.ResourcesVpcConfig.SubnetIds).To(HaveLen(4))
+			Expect(controlPlane.ResourcesVpcConfig.SecurityGroupIDs[0]).To(ContainElement("ControlPlaneSecurityGroup"))
+			Expect(controlPlane.ResourcesVpcConfig.SubnetIDs).To(HaveLen(4))
 			Expect(controlPlane.RoleArn).To(ContainElement([]interface{}{"ServiceRole", "Arn"}))
 			Expect(controlPlane.EncryptionConfig).To(BeNil())
 			Expect(controlPlane.KubernetesNetworkConfig.ServiceIPv4CIDR).To(Equal("131.10.55.70/18"))
@@ -275,24 +275,17 @@ var _ = Describe("Cluster Template Builder", func() {
 
 			It("should not add the ControlPlaneSecurityGroup resources", func() {
 				Expect(clusterTemplate.Resources).NotTo(HaveKey("ControlPlaneSecurityGroup"))
-				Expect(clusterTemplate.Resources["ControlPlane"].Properties.ResourcesVpcConfig.SecurityGroupIds).To(ContainElement("foo"))
+				Expect(clusterTemplate.Resources["ControlPlane"].Properties.ResourcesVpcConfig.SecurityGroupIDs).To(ContainElement("foo"))
 			})
 		})
 
 		It("should add iam resources and policies", func() {
 			Expect(clusterTemplate.Resources).To(HaveKey("ServiceRole"))
-			Expect(clusterTemplate.Resources).To(HaveKey("PolicyELBPermissions"))
-			Expect(clusterTemplate.Resources).To(HaveKey("PolicyCloudWatchMetrics"))
 		})
 
 		It("should add the correct policies and references to the ServiceRole ARN", func() {
 			Expect(clusterTemplate.Resources["ServiceRole"].Properties.ManagedPolicyArns).To(HaveLen(2))
 			Expect(clusterTemplate.Resources["ServiceRole"].Properties.ManagedPolicyArns).To(ContainElements(makePolicyARNRef("AmazonEKSClusterPolicy"), makePolicyARNRef("AmazonEKSVPCResourceController")))
-
-			cwPolicy := clusterTemplate.Resources["PolicyCloudWatchMetrics"].Properties
-			Expect(isRefTo(cwPolicy.Roles[0], "ServiceRole")).To(BeTrue())
-			elbPolicy := clusterTemplate.Resources["PolicyELBPermissions"].Properties
-			Expect(isRefTo(elbPolicy.Roles[0], "ServiceRole")).To(BeTrue())
 		})
 
 		It("should add iam outputs", func() {
