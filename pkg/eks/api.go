@@ -200,14 +200,9 @@ func newAWSProvider(spec *api.ProviderConfig, configurationLoader AWSConfigurati
 
 	provider.asg = autoscaling.NewFromConfig(cfg)
 	provider.cloudwatchlogs = cloudwatchlogs.NewFromConfig(cfg)
-	provider.cloudtrail = cloudtrail.NewFromConfig(cfg)
-
-	if endpoint, ok := os.LookupEnv("AWS_CLOUDTRAIL_ENDPOINT"); ok {
-		logger.Debug("Setting CloudTrail endpoint to %s", endpoint)
-		provider.cloudtrail = cloudtrail.NewFromConfig(cfg, func(o *cloudtrail.Options) {
-			o.BaseEndpoint = &endpoint
-		})
-	}
+	provider.cloudtrail = cloudtrail.NewFromConfig(cfg, func(o *cloudtrail.Options) {
+		o.BaseEndpoint = getBaseEndpoint(cloudtrail.ServiceID, "AWS_CLOUDTRAIL_ENDPOINT")
+	})
 
 	return provider, nil
 }
@@ -237,7 +232,12 @@ func ParseConfig(data []byte) (*api.ClusterConfig, error) {
 
 // LoadConfigFromFile loads ClusterConfig from configFile
 func LoadConfigFromFile(configFile string) (*api.ClusterConfig, error) {
-	data, err := readConfig(configFile)
+	return LoadConfigWithReader(configFile, nil)
+}
+
+// LoadConfigWithReader loads ClusterConfig from configFile or configReader.
+func LoadConfigWithReader(configFile string, configReader io.Reader) (*api.ClusterConfig, error) {
+	data, err := readConfig(configFile, configReader)
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading config file %q", configFile)
 	}
@@ -246,12 +246,14 @@ func LoadConfigFromFile(configFile string) (*api.ClusterConfig, error) {
 		return nil, errors.Wrapf(err, "loading config file %q", configFile)
 	}
 	return clusterConfig, nil
-
 }
 
-func readConfig(configFile string) ([]byte, error) {
+func readConfig(configFile string, reader io.Reader) ([]byte, error) {
 	if configFile == "-" {
-		return io.ReadAll(os.Stdin)
+		if reader == nil {
+			reader = os.Stdin
+		}
+		return io.ReadAll(reader)
 	}
 	return os.ReadFile(configFile)
 }

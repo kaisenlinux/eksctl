@@ -3,10 +3,10 @@ Section: admin
 Priority: optional
 Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 Build-Depends: debhelper-compat (= 13),
-	       golang-go (>= 1.18),
+	       golang-go (>= 1.21),
 	       dh-golang,
 	       mkdocs,
-Standards-Version: 4.6.2
+Standards-Version: 4.7.2
 Homepage: https://eksctl.io/
 Vcs-Browser: https://gitlab.com/kaisenlinux/packages/eksctl
 Vcs-Git: https://gitlab.com/kaisenlinux/packages/eksctl.git

@@ -1,3 +1,12 @@
+eksctl (0.188.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import the 0.188.0 version
+  * Update the quilt patch
+  * Bump the golang-go version required to build
+  * Bump the Standards-Version
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Sat, 17 Aug 2024 02:27:07 +0200
+
 eksctl (0.176.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import the 0.176.0 version

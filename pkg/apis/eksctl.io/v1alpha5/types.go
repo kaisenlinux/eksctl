@@ -43,10 +43,12 @@ const (
 
 	Version1_29 = "1.29"
 
-	// DefaultVersion (default)
-	DefaultVersion = Version1_29
+	Version1_30 = "1.30"
 
-	LatestVersion = Version1_29
+	// DefaultVersion (default)
+	DefaultVersion = Version1_30
+
+	LatestVersion = Version1_30
 
 	DockershimDeprecationVersion = Version1_24
 )
@@ -95,8 +97,8 @@ const (
 
 // Not yet supported versions
 const (
-	// Version1_30 represents Kubernetes version 1.30.x
-	Version1_30 = "1.30"
+	// Version1_31 represents Kubernetes version 1.31.x
+	Version1_31 = "1.31"
 )
 
 const (
@@ -169,6 +171,9 @@ const (
 	// RegionAPSouthEast4 represents the Asia-Pacific South East Region Melbourne
 	RegionAPSouthEast4 = "ap-southeast-4"
 
+	// RegionAPSouthEast5 represents the Asia-Pacific South East Region Kuala Lumpur
+	RegionAPSouthEast5 = "ap-southeast-5"
+
 	// RegionAPSouth1 represents the Asia-Pacific South Region Mumbai
 	RegionAPSouth1 = "ap-south-1"
 
@@ -225,6 +230,7 @@ const (
 	DefaultNodeImageFamily         = NodeImageFamilyAmazonLinux2
 	NodeImageFamilyAmazonLinux2023 = "AmazonLinux2023"
 	NodeImageFamilyAmazonLinux2    = "AmazonLinux2"
+	NodeImageFamilyUbuntuPro2204   = "UbuntuPro2204"
 	NodeImageFamilyUbuntu2204      = "Ubuntu2204"
 	NodeImageFamilyUbuntu2004      = "Ubuntu2004"
 	NodeImageFamilyUbuntu1804      = "Ubuntu1804"
@@ -295,6 +301,9 @@ const (
 
 	// PodIdentityAssociationNameTag defines the tag of Pod Identity Association name
 	PodIdentityAssociationNameTag = "alpha.eksctl.io/podidentityassociation-name"
+
+	// AddonPodIdentityAssociationNameTag defines the tag name for an addon's pod identity association.
+	AddonPodIdentityAssociationNameTag = "alpha.eksctl.io/addon-podidentityassociation-name"
 
 	// AddonNameTag defines the tag of the IAM service account name
 	AddonNameTag = "alpha.eksctl.io/addon-name"
@@ -379,6 +388,10 @@ const (
 
 	// eksResourceAccountAPSouthEast4 defines the AWS EKS account ID that provides node resources in ap-southeast-4
 	eksResourceAccountAPSouthEast4 = "491585149902"
+
+	// eksResourceAccountAPSouthEast5 defines the AWS EKS account ID that provides node resources in ap-southeast-5
+	eksResourceAccountAPSouthEast5 = "151610086707"
+
 	// eksResourceAccountUSISOEast1 defines the AWS EKS account ID that provides node resources in us-iso-east-1
 	eksResourceAccountUSISOEast1 = "725322719131"
 
@@ -427,17 +440,6 @@ const (
 	IPV4Family = "IPv4"
 	// IPV6Family defines an IP family of v6 to be used when creating a new VPC and cluster.
 	IPV6Family = "IPv6"
-)
-
-// Values for core addons
-const (
-	minimumVPCCNIVersionForIPv6 = "1.10.0"
-	VPCCNIAddon                 = "vpc-cni"
-	KubeProxyAddon              = "kube-proxy"
-	CoreDNSAddon                = "coredns"
-	PodIdentityAgentAddon       = "eks-pod-identity-agent"
-	AWSEBSCSIDriverAddon        = "aws-ebs-csi-driver"
-	AWSEFSCSIDriverAddon        = "aws-efs-csi-driver"
 )
 
 // supported version of Karpenter
@@ -521,6 +523,7 @@ func SupportedRegions() []string {
 		RegionAPSouthEast2,
 		RegionAPSouthEast3,
 		RegionAPSouthEast4,
+		RegionAPSouthEast5,
 		RegionAPSouth1,
 		RegionAPSouth2,
 		RegionAPEast1,
@@ -580,6 +583,7 @@ func SupportedVersions() []string {
 		Version1_27,
 		Version1_28,
 		Version1_29,
+		Version1_30,
 	}
 }
 
@@ -609,6 +613,7 @@ func SupportedAMIFamilies() []string {
 	return []string{
 		NodeImageFamilyAmazonLinux2023,
 		NodeImageFamilyAmazonLinux2,
+		NodeImageFamilyUbuntuPro2204,
 		NodeImageFamilyUbuntu2204,
 		NodeImageFamilyUbuntu2004,
 		NodeImageFamilyUbuntu1804,
@@ -665,6 +670,8 @@ func EKSResourceAccountID(region string) string {
 		return eksResourceAccountAPSouthEast3
 	case RegionAPSouthEast4:
 		return eksResourceAccountAPSouthEast4
+	case RegionAPSouthEast5:
+		return eksResourceAccountAPSouthEast5
 	case RegionILCentral1:
 		return eksResourceAccountILCentral1
 	case RegionUSISOEast1:
@@ -898,6 +905,10 @@ type ClusterConfig struct {
 
 	// +optional
 	Addons []*Addon `json:"addons,omitempty"`
+
+	// AddonsConfig specifies the configuration for addons.
+	// +optional
+	AddonsConfig AddonsConfig `json:"addonsConfig,omitempty"`
 
 	// PrivateCluster allows configuring a fully-private cluster
 	// in which no node has outbound internet access, and private access
@@ -1647,7 +1658,7 @@ type NodeGroupBase struct {
 	// +optional
 	DisableIMDSv1 *bool `json:"disableIMDSv1,omitempty"`
 
-	// DisablePodIMDS blocks all IMDS requests from non host networking pods
+	// DisablePodIMDS blocks all IMDS requests from non-host networking pods
 	// Defaults to `false`
 	// +optional
 	DisablePodIMDS *bool `json:"disablePodIMDS,omitempty"`

@@ -2,6 +2,7 @@ package v1alpha5
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -40,6 +41,28 @@ type AccessScope struct {
 	// Scope access to namespace(s)
 	// +optional
 	Namespaces []string `json:"namespaces,omitempty"`
+}
+
+// AccessEntryType represents the type of access entry.
+type AccessEntryType string
+
+const (
+	// AccessEntryTypeLinux specifies the EC2 Linux access entry type.
+	AccessEntryTypeLinux AccessEntryType = "EC2_LINUX"
+	// AccessEntryTypeWindows specifies the Windows access entry type.
+	AccessEntryTypeWindows AccessEntryType = "EC2_WINDOWS"
+	// AccessEntryTypeFargateLinux specifies the Fargate Linux access entry type.
+	AccessEntryTypeFargateLinux AccessEntryType = "FARGATE_LINUX"
+	// AccessEntryTypeStandard specifies a standard access entry type.
+	AccessEntryTypeStandard AccessEntryType = "STANDARD"
+)
+
+// GetAccessEntryType returns the access entry type for the specified AMI family.
+func GetAccessEntryType(ng *NodeGroup) AccessEntryType {
+	if IsWindowsImage(ng.GetAMIFamily()) {
+		return AccessEntryTypeWindows
+	}
+	return AccessEntryTypeLinux
 }
 
 type ARN arn.ARN
@@ -94,6 +117,22 @@ func MustParseARN(a string) ARN {
 	return ARN(parsed)
 }
 
+// RoleNameFromARN returns the role name for roleARN.
+func RoleNameFromARN(roleARN string) (string, error) {
+	parsed, err := arn.Parse(roleARN)
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(parsed.Resource, "/")
+	if len(parts) != 2 {
+		return "", errors.New("invalid format for role ARN")
+	}
+	if parts[0] != "role" {
+		return "", fmt.Errorf("expected resource type to be %q; got %q", "role", parts[0])
+	}
+	return parts[1], nil
+}
+
 // validateAccessEntries validates accessEntries.
 func validateAccessEntries(accessEntries []AccessEntry) error {
 	seen := make(map[ARN]struct{})
@@ -103,9 +142,9 @@ func validateAccessEntries(accessEntries []AccessEntry) error {
 			return fmt.Errorf("%s.principalARN must be set to a valid AWS ARN", path)
 		}
 
-		switch ae.Type {
-		case "", "STANDARD":
-		case "EC2_LINUX", "EC2_WINDOWS", "FARGATE_LINUX":
+		switch AccessEntryType(ae.Type) {
+		case "", AccessEntryTypeStandard:
+		case AccessEntryTypeLinux, AccessEntryTypeWindows, AccessEntryTypeFargateLinux:
 			if len(ae.KubernetesGroups) > 0 || ae.KubernetesUsername != "" {
 				return fmt.Errorf("cannot specify %s.kubernetesGroups nor %s.kubernetesUsername when type is set to %s", path, path, ae.Type)
 			}

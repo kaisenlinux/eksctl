@@ -20,6 +20,7 @@ func IsARMInstanceType(instanceType string) bool {
 		strings.HasPrefix(instanceType, "im4g") ||
 		strings.HasPrefix(instanceType, "is4g") ||
 		strings.HasPrefix(instanceType, "g5g") ||
+		strings.HasPrefix(instanceType, "hpc7g") ||
 		strings.HasPrefix(instanceType, "x2g")
 }
 
@@ -49,7 +50,8 @@ func IsNvidiaInstanceType(instanceType string) bool {
 		strings.HasPrefix(instanceType, "p5") ||
 		strings.HasPrefix(instanceType, "g3") ||
 		strings.HasPrefix(instanceType, "g4") ||
-		strings.HasPrefix(instanceType, "g5")
+		strings.HasPrefix(instanceType, "g5") ||
+		strings.HasPrefix(instanceType, "g6")
 }
 
 // IsInferentiaInstanceType returns true if the instance type requires AWS Neuron

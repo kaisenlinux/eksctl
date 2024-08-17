@@ -45,6 +45,11 @@ func doCreatePodIdentityAssociation(cmd *cmdutils.Cmd) error {
 		return err
 	}
 
+	clientSet, err := ctl.NewStdClientSet(cfg)
+	if err != nil {
+		return err
+	}
+
 	isInstalled, err := podidentityassociation.IsPodIdentityAgentInstalled(ctx, ctl.AWSProvider.EKS(), cfg.Metadata.Name)
 	if err != nil {
 		return err
@@ -55,7 +60,7 @@ func doCreatePodIdentityAssociation(cmd *cmdutils.Cmd) error {
 		return api.ErrPodIdentityAgentNotInstalled(suggestion)
 	}
 
-	return podidentityassociation.NewCreator(cmd.ClusterConfig.Metadata.Name, ctl.NewStackManager(cfg), ctl.AWSProvider.EKS()).
+	return podidentityassociation.NewCreator(cmd.ClusterConfig.Metadata.Name, ctl.NewStackManager(cfg), ctl.AWSProvider.EKS(), clientSet).
 		CreatePodIdentityAssociations(ctx, cmd.ClusterConfig.IAM.PodIdentityAssociations)
 }
 
@@ -66,6 +71,8 @@ func configureCreatePodIdentityAssociationCmd(cmd *cmdutils.Cmd, pia *api.PodIde
 		fs.StringVar(&pia.RoleARN, "role-arn", "", "ARN of the IAM role to be associated with the service account")
 		fs.StringVar(&pia.RoleName, "role-name", "", "Set a custom name for the created role")
 		fs.StringVar(&pia.PermissionsBoundaryARN, "permission-boundary-arn", "", "ARN of the policy that is used to set the permission boundary for the role")
+
+		fs.BoolVar(&pia.CreateServiceAccount, "create-service-account", false, "instructs eksctl to create the K8s service account")
 
 		fs.StringSliceVar(&pia.PermissionPolicyARNs, "permission-policy-arns", []string{}, "List of ARNs of the IAM permission policies to attach")
 

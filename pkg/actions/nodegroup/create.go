@@ -38,6 +38,7 @@ type CreateOpts struct {
 	DryRunSettings            DryRunSettings
 	SkipOutdatedAddonsCheck   bool
 	ConfigFileProvided        bool
+	Parallelism               int
 }
 
 type DryRunSettings struct {
@@ -79,9 +80,11 @@ func (m *Manager) Create(ctx context.Context, options CreateOpts, nodegroupFilte
 				return errors.Wrapf(err, "loading VPC spec for cluster %q", meta.Name)
 			}
 			isOwnedCluster = false
-			skipEgressRules, err = validateSecurityGroup(ctx, ctl.AWSProvider.EC2(), cfg.VPC.SecurityGroup)
-			if err != nil {
-				return err
+			if len(cfg.NodeGroups) > 0 {
+				skipEgressRules, err = validateSecurityGroup(ctx, ctl.AWSProvider.EC2(), cfg.VPC.SecurityGroup)
+				if err != nil {
+					return err
+				}
 			}
 
 		default:
@@ -135,6 +138,10 @@ func (m *Manager) Create(ctx context.Context, options CreateOpts, nodegroupFilte
 		}
 	}
 
+	if err := validateSubnetsAvailability(cfg); err != nil {
+		return err
+	}
+
 	if err := vpc.ValidateLegacySubnetsForNodeGroups(ctx, cfg, ctl.AWSProvider); err != nil {
 		return err
 	}
@@ -167,7 +174,7 @@ func (m *Manager) Create(ctx context.Context, options CreateOpts, nodegroupFilte
 		return cmdutils.PrintNodeGroupDryRunConfig(clusterConfigCopy, options.DryRunSettings.OutStream)
 	}
 
-	if err := m.nodeCreationTasks(ctx, isOwnedCluster, skipEgressRules, options.UpdateAuthConfigMap); err != nil {
+	if err := m.nodeCreationTasks(ctx, isOwnedCluster, skipEgressRules, options.UpdateAuthConfigMap, options.Parallelism); err != nil {
 		return err
 	}
 
@@ -199,7 +206,7 @@ func makeOutpostsService(clusterConfig *api.ClusterConfig, provider api.ClusterP
 	}
 }
 
-func (m *Manager) nodeCreationTasks(ctx context.Context, isOwnedCluster, skipEgressRules bool, updateAuthConfigMap *bool) error {
+func (m *Manager) nodeCreationTasks(ctx context.Context, isOwnedCluster, skipEgressRules bool, updateAuthConfigMap *bool, parallelism int) error {
 	cfg := m.cfg
 	meta := cfg.Metadata
 
@@ -254,11 +261,11 @@ func (m *Manager) nodeCreationTasks(ctx context.Context, isOwnedCluster, skipEgr
 		Parallel: true,
 	}
 	disableAccessEntryCreation := !m.accessEntry.IsEnabled() || updateAuthConfigMap != nil
-	nodeGroupTasks := m.stackManager.NewUnmanagedNodeGroupTask(ctx, cfg.NodeGroups, !awsNodeUsesIRSA, skipEgressRules, disableAccessEntryCreation, vpcImporter)
-	if nodeGroupTasks.Len() > 0 {
+	if nodeGroupTasks := m.stackManager.NewUnmanagedNodeGroupTask(ctx, cfg.NodeGroups, !awsNodeUsesIRSA, skipEgressRules,
+		disableAccessEntryCreation, vpcImporter, parallelism); nodeGroupTasks.Len() > 0 {
 		allNodeGroupTasks.Append(nodeGroupTasks)
 	}
-	managedTasks := m.stackManager.NewManagedNodeGroupTask(ctx, cfg.ManagedNodeGroups, !awsNodeUsesIRSA, vpcImporter)
+	managedTasks := m.stackManager.NewManagedNodeGroupTask(ctx, cfg.ManagedNodeGroups, !awsNodeUsesIRSA, vpcImporter, parallelism)
 	if managedTasks.Len() > 0 {
 		allNodeGroupTasks.Append(managedTasks)
 	}
@@ -403,4 +410,65 @@ func validateSecurityGroup(ctx context.Context, ec2API awsapi.EC2, securityGroup
 		}
 	}
 	return hasDefaultEgressRule, nil
+}
+
+func validateSubnetsAvailability(spec *api.ClusterConfig) error {
+	getAZs := func(subnetMapping api.AZSubnetMapping) map[string]struct{} {
+		azs := make(map[string]struct{})
+		for _, subnet := range subnetMapping {
+			azs[subnet.AZ] = struct{}{}
+		}
+		return azs
+	}
+	privateAZs := getAZs(spec.VPC.Subnets.Private)
+	publicAZs := getAZs(spec.VPC.Subnets.Public)
+
+	validateSubnetsAvailabilityForNg := func(np api.NodePool) error {
+		ng := np.BaseNodeGroup()
+		subnetTypeForPrivateNetworking := map[bool]string{
+			true:  "private",
+			false: "public",
+		}
+		unavailableSubnetsErr := func(subnetLocation string) error {
+			return fmt.Errorf("all %[1]s subnets from %[2]s, that the cluster was originally created on, have been deleted; to create %[1]s nodegroups within %[2]s please manually set valid %[1]s subnets via nodeGroup.SubnetIDs",
+				subnetTypeForPrivateNetworking[ng.PrivateNetworking], subnetLocation)
+		}
+
+		// don't check private networking compatibility for:
+		// self-managed nodegroups on local zones
+		if nodeGroup, ok := np.(*api.NodeGroup); (ok && len(nodeGroup.LocalZones) > 0) ||
+			// nodegroups on outposts
+			(ng.OutpostARN != "" || spec.IsControlPlaneOnOutposts()) ||
+			// nodegroups on user specified subnets
+			len(ng.Subnets) > 0 {
+			return nil
+		}
+		shouldCheckAcrossAllAZs := true
+		for _, az := range ng.AvailabilityZones {
+			shouldCheckAcrossAllAZs = false
+			if _, ok := privateAZs[az]; !ok && ng.PrivateNetworking {
+				return unavailableSubnetsErr(az)
+			}
+			if _, ok := publicAZs[az]; !ok && !ng.PrivateNetworking {
+				return unavailableSubnetsErr(az)
+			}
+		}
+		if shouldCheckAcrossAllAZs {
+			if ng.PrivateNetworking && len(privateAZs) == 0 {
+				return unavailableSubnetsErr(spec.VPC.ID)
+			}
+			if !ng.PrivateNetworking && len(publicAZs) == 0 {
+				return unavailableSubnetsErr(spec.VPC.ID)
+			}
+		}
+		return nil
+	}
+
+	for _, np := range nodes.ToNodePools(spec) {
+		if err := validateSubnetsAvailabilityForNg(np); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

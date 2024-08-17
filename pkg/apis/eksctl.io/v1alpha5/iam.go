@@ -52,9 +52,8 @@ type ClusterIAM struct {
 	// See [IAM Service Accounts](/usage/iamserviceaccounts/#usage-with-config-files)
 	// +optional
 	ServiceAccounts []*ClusterIAMServiceAccount `json:"serviceAccounts,omitempty"`
-
 	// pod identity associations to create in the cluster.
-	// See [Pod Identity Associations](TBD)
+	// See [Pod Identity Associations](/usage/pod-identity-associations)
 	// +optional
 	PodIdentityAssociations []PodIdentityAssociation `json:"podIdentityAssociations,omitempty"`
 
@@ -176,6 +175,9 @@ type PodIdentityAssociation struct {
 	RoleARN string `json:"roleARN"`
 
 	// +optional
+	CreateServiceAccount bool `json:"createServiceAccount,omitempty"`
+
+	// +optional
 	RoleName string `json:"roleName,omitempty"`
 
 	// +optional
@@ -195,6 +197,9 @@ type PodIdentityAssociation struct {
 }
 
 func (p PodIdentityAssociation) NameString() string {
+	if p.Namespace == "" {
+		return p.ServiceAccountName
+	}
 	return p.Namespace + "/" + p.ServiceAccountName
 }
 

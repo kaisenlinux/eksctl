@@ -273,6 +273,7 @@ var _ = Describe("create cluster", func() {
 
 		clusterConfig := api.NewClusterConfig()
 		clusterConfig.Metadata.Name = clusterName
+		clusterConfig.AddonsConfig.DisableDefaultAddons = true
 		clusterConfig.VPC.ClusterEndpoints = api.ClusterEndpointAccessDefaults()
 		clusterConfig.AccessConfig.AuthenticationMode = ekstypes.AuthenticationModeApiAndConfigMap
 
@@ -327,9 +328,7 @@ var _ = Describe("create cluster", func() {
 			updateClusterParams: func(params *cmdutils.CreateClusterCmdParams) {
 				params.InstallNvidiaDevicePlugin = true
 			},
-			updateMocks: func(p *mockprovider.MockProvider) {
-				updateMocksForNodegroups(cftypes.StackStatusCreateComplete, defaultOutputForNodeGroup)(p)
-			},
+			updateMocks: updateMocksForNodegroups(cftypes.StackStatusCreateComplete, defaultOutputForNodeGroup),
 			updateKubeProvider: func(fk *fakes.FakeKubeProvider) {
 				rawClient, err := kubernetes.NewRawClient(kubefake.NewSimpleClientset(), &rest.Config{})
 				Expect(err).To(Not(HaveOccurred()))
@@ -441,6 +440,41 @@ var _ = Describe("create cluster", func() {
 				c.NodeGroups = append(c.NodeGroups, getDefaultNodeGroup())
 			},
 			updateMocks: updateMocksForNodegroups(cftypes.StackStatusCreateComplete, defaultOutputForNodeGroup),
+			updateKubeProvider: func(fk *fakes.FakeKubeProvider) {
+				node := getDefaultNode()
+				clientset := kubefake.NewSimpleClientset(node)
+				watcher := watch.NewFake()
+				go func() {
+					defer watcher.Stop()
+					watcher.Add(node)
+				}()
+				clientset.PrependWatchReactor("nodes", k8stest.DefaultWatchReactor(watcher, nil))
+				fk.NewStdClientSetReturns(clientset, nil)
+			},
+		}),
+
+		Entry("nodegroup with an instance role ARN", createClusterEntry{
+			updateClusterConfig: func(c *api.ClusterConfig) {
+				ng := getDefaultNodeGroup()
+				ng.IAM.InstanceRoleARN = "role-1"
+				c.NodeGroups = []*api.NodeGroup{ng}
+			},
+			updateMocks: func(mp *mockprovider.MockProvider) {
+				updateMocksForNodegroups(cftypes.StackStatusCreateComplete, defaultOutputForNodeGroup)(mp)
+				mp.MockEKS().On("DescribeAccessEntry", mock.Anything, &awseks.DescribeAccessEntryInput{
+					PrincipalArn: aws.String("role-1"),
+					ClusterName:  aws.String(clusterName),
+				}).Return(nil, &ekstypes.ResourceNotFoundException{ClusterName: aws.String(clusterName)}).Once()
+
+				mp.MockEKS().On("CreateAccessEntry", mock.Anything, &awseks.CreateAccessEntryInput{
+					PrincipalArn: aws.String("role-1"),
+					ClusterName:  aws.String(clusterName),
+					Type:         aws.String("EC2_LINUX"),
+					Tags: map[string]string{
+						api.ClusterNameLabel: clusterName,
+					},
+				}).Return(&awseks.CreateAccessEntryOutput{}, nil).Once()
+			},
 			updateKubeProvider: func(fk *fakes.FakeKubeProvider) {
 				node := getDefaultNode()
 				clientset := kubefake.NewSimpleClientset(node)
@@ -720,15 +754,16 @@ var _ = Describe("create cluster", func() {
 })
 
 var (
-	clusterName        = "my-cluster"
-	clusterStackName   = "eksctl-" + clusterName + "-cluster"
-	nodeGroupName      = "my-nodegroup"
-	nodeGroupStackName = "eksctl-" + clusterName + "-nodegroup-" + nodeGroupName
+	clusterName         = "my-cluster"
+	clusterStackName    = "eksctl-" + clusterName + "-cluster"
+	nodeGroupName       = "my-nodegroup"
+	nodeGroupStackName  = "eksctl-" + clusterName + "-nodegroup-" + nodeGroupName
+	nodeInstanceRoleARN = "arn:aws:iam::083751696308:role/eksctl-my-cluster-cluster-nodegroup-my-nodegroup-NodeInstanceRole-1IYQ3JS8OKPX1"
 
 	defaultOutputForNodeGroup = []cftypes.Output{
 		{
 			OutputKey:   aws.String(outputs.NodeGroupInstanceRoleARN),
-			OutputValue: aws.String("arn:aws:iam::083751696308:role/eksctl-my-cluster-cluster-nodegroup-my-nodegroup-NodeInstanceRole-1IYQ3JS8OKPX1"),
+			OutputValue: aws.String(nodeInstanceRoleARN),
 		},
 		{
 			OutputKey:   aws.String(outputs.NodeGroupInstanceProfileARN),
@@ -843,7 +878,7 @@ var (
 
 	updateMocksForNodegroups = func(status cftypes.StackStatus, outputs []cftypes.Output) func(mp *mockprovider.MockProvider) {
 		return func(mp *mockprovider.MockProvider) {
-			mp.MockEC2().On("DescribeInstanceTypeOfferings", mock.Anything, mock.Anything).Return(&ec2.DescribeInstanceTypeOfferingsOutput{
+			mp.MockEC2().On("DescribeInstanceTypeOfferings", mock.Anything, mock.Anything, mock.Anything).Return(&ec2.DescribeInstanceTypeOfferingsOutput{
 				InstanceTypeOfferings: []ec2types.InstanceTypeOffering{
 					{
 						InstanceType: "g3.xlarge",
@@ -887,7 +922,7 @@ var (
 						Outputs: outputs,
 					},
 				},
-			}, nil).Once()
+			}, nil).Twice()
 		}
 	}
 )
@@ -917,7 +952,7 @@ func defaultProviderMocks(p *mockprovider.MockProvider, output []cftypes.Output,
 				ZoneId:    aws.String("id"),
 			}},
 	}, nil)
-	p.MockCloudFormation().On("ListStacks", mock.Anything, mock.Anything).Return(&cloudformation.ListStacksOutput{
+	p.MockCloudFormation().On("ListStacks", mock.Anything, mock.Anything, mock.Anything).Return(&cloudformation.ListStacksOutput{
 		StackSummaries: []cftypes.StackSummary{
 			{
 				StackName:   aws.String(clusterStackName),
@@ -1005,7 +1040,7 @@ func defaultProviderMocks(p *mockprovider.MockProvider, output []cftypes.Output,
 				},
 			},
 		}, nil)
-	p.MockEC2().On("DescribeSubnets", mock.Anything, mock.Anything).Return(&ec2.DescribeSubnetsOutput{
+	p.MockEC2().On("DescribeSubnets", mock.Anything, mock.Anything, mock.Anything).Return(&ec2.DescribeSubnetsOutput{
 		Subnets: []ec2types.Subnet{},
 	}, nil)
 	p.MockEC2().On("DescribeVpcs", mock.Anything, mock.Anything).Return(&ec2.DescribeVpcsOutput{
@@ -1041,7 +1076,7 @@ func mockOutposts(provider *mockprovider.MockProvider, outpostID string) {
 	}, nil)
 	provider.MockOutposts().On("GetOutpostInstanceTypes", mock.Anything, &outposts.GetOutpostInstanceTypesInput{
 		OutpostId: aws.String(outpostID),
-	}).Return(&outposts.GetOutpostInstanceTypesOutput{
+	}, mock.Anything).Return(&outposts.GetOutpostInstanceTypesOutput{
 		InstanceTypes: []outpoststypes.InstanceTypeItem{
 			{
 				InstanceType: aws.String("m5.xlarge"),
@@ -1050,7 +1085,7 @@ func mockOutposts(provider *mockprovider.MockProvider, outpostID string) {
 	}, nil)
 	provider.MockEC2().On("DescribeInstanceTypes", mock.Anything, &ec2.DescribeInstanceTypesInput{
 		InstanceTypes: []ec2types.InstanceType{"m5.xlarge"},
-	}).Return(&ec2.DescribeInstanceTypesOutput{
+	}, mock.Anything).Return(&ec2.DescribeInstanceTypesOutput{
 		InstanceTypes: []ec2types.InstanceTypeInfo{
 			{
 				InstanceType: "m5.xlarge",

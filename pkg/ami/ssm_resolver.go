@@ -75,33 +75,48 @@ func MakeSSMParameterName(version, instanceType, imageFamily string) (string, er
 		return fmt.Sprintf("/aws/service/ami-windows-latest/Windows_Server-2022-English-%s-EKS_Optimized-%s/%s", windowsAmiType(imageFamily), version, fieldName), nil
 	case api.NodeImageFamilyBottlerocket:
 		return fmt.Sprintf("/aws/service/bottlerocket/aws-k8s-%s/%s/latest/%s", imageType(imageFamily, instanceType, version), instanceEC2ArchName(instanceType), fieldName), nil
-	case api.NodeImageFamilyUbuntu2204, api.NodeImageFamilyUbuntu2004, api.NodeImageFamilyUbuntu1804:
-		// FIXME: SSM lookup for Ubuntu EKS images is supported nowadays
-		return "", &UnsupportedQueryError{msg: fmt.Sprintf("SSM Parameter lookups for %s AMIs is not supported yet", imageFamily)}
+	case api.NodeImageFamilyUbuntu1804:
+		return "", &UnsupportedQueryError{msg: fmt.Sprintf("SSM Parameter lookups for %s AMIs is not supported", imageFamily)}
+	case api.NodeImageFamilyUbuntu2004,
+		api.NodeImageFamilyUbuntu2204,
+		api.NodeImageFamilyUbuntuPro2204:
+		if err := validateVersionForUbuntu(version, imageFamily); err != nil {
+			return "", err
+		}
+		eksProduct := "eks"
+		if imageFamily == api.NodeImageFamilyUbuntuPro2204 {
+			eksProduct = "eks-pro"
+		}
+		return fmt.Sprint("/aws/service/canonical/ubuntu/", eksProduct, "/", ubuntuReleaseName(imageFamily), "/", version, "/stable/current/", ubuntuArchName(instanceType), "/hvm/ebs-gp2/ami-id"), nil
 	default:
 		return "", fmt.Errorf("unknown image family %s", imageFamily)
 	}
 }
 
 // MakeManagedSSMParameterName creates an SSM parameter name for a managed nodegroup
-func MakeManagedSSMParameterName(version string, amiType ekstypes.AMITypes) (string, error) {
+func MakeManagedSSMParameterName(version string, amiType ekstypes.AMITypes) string {
+	makeAL2ParameterName := func(imageTypeSuffix string) string {
+		imageType := utils.ToKebabCase(api.NodeImageFamilyAmazonLinux2) + imageTypeSuffix
+		return fmt.Sprintf("/aws/service/eks/optimized-ami/%s/%s/recommended/release_version", version, imageType)
+	}
 	switch amiType {
 	case ekstypes.AMITypesAl2023X8664Standard:
-		return fmt.Sprintf("/aws/service/eks/optimized-ami/%s/%s/x86_64/standard/recommended/release_version", version, utils.ToKebabCase(api.NodeImageFamilyAmazonLinux2023)), nil
+		return fmt.Sprintf("/aws/service/eks/optimized-ami/%s/%s/x86_64/standard/recommended/release_version", version, utils.ToKebabCase(api.NodeImageFamilyAmazonLinux2023))
 	case ekstypes.AMITypesAl2023Arm64Standard:
-		return fmt.Sprintf("/aws/service/eks/optimized-ami/%s/%s/arm64/standard/recommended/release_version", version, utils.ToKebabCase(api.NodeImageFamilyAmazonLinux2023)), nil
+		return fmt.Sprintf("/aws/service/eks/optimized-ami/%s/%s/arm64/standard/recommended/release_version", version, utils.ToKebabCase(api.NodeImageFamilyAmazonLinux2023))
 	case ekstypes.AMITypesAl2X8664:
-		imageType := utils.ToKebabCase(api.NodeImageFamilyAmazonLinux2)
-		return fmt.Sprintf("/aws/service/eks/optimized-ami/%s/%s/recommended/release_version", version, imageType), nil
+		return makeAL2ParameterName("")
 	case ekstypes.AMITypesAl2X8664Gpu:
-		imageType := utils.ToKebabCase(api.NodeImageFamilyAmazonLinux2) + "-gpu"
-		return fmt.Sprintf("/aws/service/eks/optimized-ami/%s/%s/recommended/release_version", version, imageType), nil
+		return makeAL2ParameterName("-gpu")
+	case ekstypes.AMITypesAl2Arm64:
+		return makeAL2ParameterName("-arm64")
 	case ekstypes.AMITypesBottlerocketArm64, ekstypes.AMITypesBottlerocketArm64Nvidia:
-		return fmt.Sprintf("/aws/service/bottlerocket/aws-k8s-%s/arm64/latest/image_version", version), nil
+		return fmt.Sprintf("/aws/service/bottlerocket/aws-k8s-%s/arm64/latest/image_version", version)
 	case ekstypes.AMITypesBottlerocketX8664, ekstypes.AMITypesBottlerocketX8664Nvidia:
-		return fmt.Sprintf("/aws/service/bottlerocket/aws-k8s-%s/x86_64/latest/image_version", version), nil
+		return fmt.Sprintf("/aws/service/bottlerocket/aws-k8s-%s/x86_64/latest/image_version", version)
+	default:
+		return ""
 	}
-	return "", nil
 }
 
 // instanceEC2ArchName returns the name of the architecture as used by EC2
@@ -111,6 +126,13 @@ func instanceEC2ArchName(instanceType string) string {
 		return "arm64"
 	}
 	return "x86_64"
+}
+
+func ubuntuArchName(instanceType string) string {
+	if instanceutils.IsARMInstanceType(instanceType) {
+		return "arm64"
+	}
+	return "amd64"
 }
 
 func imageType(imageFamily, instanceType, version string) string {
@@ -137,4 +159,53 @@ func windowsAmiType(imageFamily string) string {
 		return "Core"
 	}
 	return "Full"
+}
+
+func ubuntuReleaseName(imageFamily string) string {
+	switch imageFamily {
+	case api.NodeImageFamilyUbuntu2004:
+		return "20.04"
+	case api.NodeImageFamilyUbuntu2204, api.NodeImageFamilyUbuntuPro2204:
+		return "22.04"
+	default:
+		return "18.04"
+	}
+}
+
+func validateVersionForUbuntu(version, imageFamily string) error {
+	switch imageFamily {
+	case api.NodeImageFamilyUbuntu2004:
+		var err error
+		supportsUbuntu := false
+		const minVersion = api.Version1_21
+		const maxVersion = api.Version1_29
+		supportsUbuntu, err = utils.IsMinVersion(minVersion, version)
+		if err != nil {
+			return err
+		}
+		if !supportsUbuntu {
+			return &UnsupportedQueryError{msg: fmt.Sprintf("%s requires EKS version greater or equal than %s and lower than %s", imageFamily, minVersion, maxVersion)}
+		}
+		supportsUbuntu, err = utils.IsMinVersion(version, maxVersion)
+		if err != nil {
+			return err
+		}
+		if !supportsUbuntu {
+			return &UnsupportedQueryError{msg: fmt.Sprintf("%s requires EKS version greater or equal than %s and lower than %s", imageFamily, minVersion, maxVersion)}
+		}
+	case api.NodeImageFamilyUbuntu2204, api.NodeImageFamilyUbuntuPro2204:
+		var err error
+		supportsUbuntu := false
+		const minVersion = api.Version1_29
+		supportsUbuntu, err = utils.IsMinVersion(minVersion, version)
+		if err != nil {
+			return err
+		}
+		if !supportsUbuntu {
+			return &UnsupportedQueryError{msg: fmt.Sprintf("%s requires EKS version greater or equal than %s", imageFamily, minVersion)}
+		}
+	default:
+		return &UnsupportedQueryError{msg: fmt.Sprintf("SSM Parameter lookups for %s AMIs is not supported", imageFamily)}
+	}
+	return nil
 }
