@@ -1,3 +1,10 @@
+eksctl (0.192.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import the 0.192.0 version
+  * Update the quilt patch
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Thu, 17 Oct 2024 10:52:32 +0200
+
 eksctl (0.188.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import the 0.188.0 version
