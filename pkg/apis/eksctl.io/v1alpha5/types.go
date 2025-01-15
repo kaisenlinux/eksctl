@@ -5,11 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -176,6 +175,9 @@ const (
 	// RegionAPSouthEast5 represents the Asia-Pacific South East Region Kuala Lumpur
 	RegionAPSouthEast5 = "ap-southeast-5"
 
+	// RegionAPSouthEast7 represents the Asia-Pacific South East Region Bangkok
+	RegionAPSouthEast7 = "ap-southeast-7"
+
 	// RegionAPSouth1 represents the Asia-Pacific South Region Mumbai
 	RegionAPSouth1 = "ap-south-1"
 
@@ -221,6 +223,9 @@ const (
 	// RegionUSISOWest1 represents the region US ISOB West.
 	RegionUSISOWest1 = "us-iso-west-1"
 
+	// RegionMXCentral1 represents the region of central Mexico
+	RegionMXCentral1 = "mx-central-1"
+
 	// DefaultRegion defines the default region, where to deploy the EKS cluster
 	DefaultRegion = RegionUSWest2
 )
@@ -232,6 +237,8 @@ const (
 	DefaultNodeImageFamily         = NodeImageFamilyAmazonLinux2
 	NodeImageFamilyAmazonLinux2023 = "AmazonLinux2023"
 	NodeImageFamilyAmazonLinux2    = "AmazonLinux2"
+	NodeImageFamilyUbuntuPro2404   = "UbuntuPro2404"
+	NodeImageFamilyUbuntu2404      = "Ubuntu2404"
 	NodeImageFamilyUbuntuPro2204   = "UbuntuPro2204"
 	NodeImageFamilyUbuntu2204      = "Ubuntu2204"
 	NodeImageFamilyUbuntu2004      = "Ubuntu2004"
@@ -394,6 +401,9 @@ const (
 	// eksResourceAccountAPSouthEast5 defines the AWS EKS account ID that provides node resources in ap-southeast-5
 	eksResourceAccountAPSouthEast5 = "151610086707"
 
+	// eksResourceAccountAPSouthEast7 defines the AWS EKS account ID that provides node resources in ap-southeast-7
+	eksResourceAccountAPSouthEast7 = "121268973566"
+
 	// eksResourceAccountUSISOEast1 defines the AWS EKS account ID that provides node resources in us-iso-east-1
 	eksResourceAccountUSISOEast1 = "725322719131"
 
@@ -402,6 +412,9 @@ const (
 
 	// eksResourceAccountUSISOWest1 defines the AWS EKS account ID that provides node resources in us-iso-west-1
 	eksResourceAccountUSISOWest1 = "608367168043"
+
+	// eksResourceAccountMXCentral1 defines the AWS EKS account ID that provides node resources in mx-central-1
+	eksResourceAccountMXCentral1 = "730335286997"
 )
 
 // Values for `VolumeType`
@@ -526,6 +539,7 @@ func SupportedRegions() []string {
 		RegionAPSouthEast3,
 		RegionAPSouthEast4,
 		RegionAPSouthEast5,
+		RegionAPSouthEast7,
 		RegionAPSouth1,
 		RegionAPSouth2,
 		RegionAPEast1,
@@ -541,6 +555,7 @@ func SupportedRegions() []string {
 		RegionUSISOEast1,
 		RegionUSISOBEast1,
 		RegionUSISOWest1,
+		RegionMXCentral1,
 	}
 }
 
@@ -616,6 +631,8 @@ func SupportedAMIFamilies() []string {
 	return []string{
 		NodeImageFamilyAmazonLinux2023,
 		NodeImageFamilyAmazonLinux2,
+		NodeImageFamilyUbuntuPro2404,
+		NodeImageFamilyUbuntu2404,
 		NodeImageFamilyUbuntuPro2204,
 		NodeImageFamilyUbuntu2204,
 		NodeImageFamilyUbuntu2004,
@@ -675,6 +692,8 @@ func EKSResourceAccountID(region string) string {
 		return eksResourceAccountAPSouthEast4
 	case RegionAPSouthEast5:
 		return eksResourceAccountAPSouthEast5
+	case RegionAPSouthEast7:
+		return eksResourceAccountAPSouthEast7
 	case RegionILCentral1:
 		return eksResourceAccountILCentral1
 	case RegionUSISOEast1:
@@ -683,6 +702,8 @@ func EKSResourceAccountID(region string) string {
 		return eksResourceAccountUSISOBEast1
 	case RegionUSISOWest1:
 		return eksResourceAccountUSISOWest1
+	case RegionMXCentral1:
+		return eksResourceAccountMXCentral1
 	default:
 		return eksResourceAccountStandard
 	}
@@ -715,12 +736,91 @@ type KubernetesNetworkConfig struct {
 	// Valid variants are `IPFamily` constants
 	// +optional
 	IPFamily string `json:"ipFamily,omitempty"`
-	// ServiceIPv4CIDR is the CIDR range from where `ClusterIP`s are assigned
+	// ServiceIPv4CIDR is the IPv4 CIDR range from where `ClusterIP`s are assigned
 	ServiceIPv4CIDR string `json:"serviceIPv4CIDR,omitempty"`
+	// ServiceIPv6CIDR is the IPv6 CIDR range from where `ClusterIP`s are assigned
+	ServiceIPv6CIDR string `json:"serviceIPv6CIDR,omitempty"`
 }
 
 func (k *KubernetesNetworkConfig) IPv6Enabled() bool {
 	return strings.EqualFold(k.IPFamily, IPV6Family)
+}
+
+// VPCGatewayID the ID of the gateway that facilitates external connectivity
+// from customer's VPC to their remote network(s).
+// Valid options are Transit Gateway and Virtual Private Gateway.
+type VPCGateway string
+
+var (
+	SSMProvider                 = "ssm"
+	IRAProvider                 = "ira"
+	transitGatewayPrefix        = "tgw"
+	virtualPrivateGatewayPrefix = "vgw"
+)
+
+func (v *VPCGateway) IsSet() bool {
+	return v != nil && *v != ""
+}
+
+func (v *VPCGateway) IsTransitGateway() bool {
+	return v != nil && strings.HasPrefix(string(*v), transitGatewayPrefix)
+}
+
+func (v *VPCGateway) IsVirtualPrivateGateway() bool {
+	return v != nil && strings.HasPrefix(string(*v), virtualPrivateGatewayPrefix)
+}
+
+// RemoteNetworkConfig
+type RemoteNetworkConfig struct {
+	// +optional
+	IAM *RemoteNodesIAM `json:"iam,omitempty"`
+	// +required
+	VPCGatewayID *VPCGateway `json:"vpcGatewayID,omitempty"`
+	// +required
+	RemoteNodeNetworks []*RemoteNetwork `json:"remoteNodeNetworks,omitempty"`
+	// +optional
+	RemotePodNetworks []*RemoteNetwork `json:"remotePodNetworks,omitempty"`
+}
+
+type RemoteNodesIAM struct {
+	// Provider the AWS service responsible for provisioning IAM credentials to remote nodes.
+	// Valid options are `SSM` (System Manager), default, and `IRA` (IAM Roles anywhere).
+	// Required IRA config (i.e. TrustAnchor, AnywhereProfile) will be created by eksctl behind the scenes.
+	// +optional
+	Provider *string `json:"provider,omitempty"`
+	// RoleARN the IAM Role ARN to be added to aws-auth configmap for remote nodes.
+	// If not set, eksctl creates the role behind the scenes, adds an entry into the configmap and sets up any other SSM/IRA config.
+	// If set, eksctl will only add the configmap entry, while creating any required SSM/IRA config falls under user's responsibility.
+	// +optional
+	RoleARN *string `json:"roleARN,omitempty"`
+	// CABundleCert the CA bundle certificate used by IRA trust anchor.
+	// Can't be set if Provider is SSM.
+	// +optional
+	CABundleCert *string `json:"caBundleCert,omitempty"`
+}
+
+// RemoteNetwork
+type RemoteNetwork struct {
+	CIDRs []string `json:"cidrs,omitempty"`
+}
+
+func (r *RemoteNetworkConfig) ToRemoteNetworksPool() []string {
+	remoteNetworksPool := []string{}
+	for _, r := range r.RemoteNodeNetworks {
+		remoteNetworksPool = append(remoteNetworksPool, r.CIDRs...)
+	}
+	for _, r := range r.RemotePodNetworks {
+		remoteNetworksPool = append(remoteNetworksPool, r.CIDRs...)
+	}
+	return remoteNetworksPool
+}
+
+func (r *RemoteNetworkConfig) HasRemoteNodesEnabled() bool {
+	return r.RemoteNodeNetworks != nil && len(r.RemoteNodeNetworks) > 0
+}
+
+func (c *ClusterConfig) HasRemoteNetworkingConfigured() bool {
+	return c.RemoteNetworkConfig != nil && (len(c.RemoteNetworkConfig.RemoteNodeNetworks) > 0 || len(c.RemoteNetworkConfig.RemotePodNetworks) > 0)
 }
 
 type EKSCTLCreated string
@@ -827,6 +927,11 @@ func (c *ClusterConfig) FindNodeGroupOutpostARN() (outpostARN string, found bool
 	return "", false
 }
 
+// IsAutoModeEnabled reports whether Auto Mode is enabled.
+func (c *ClusterConfig) IsAutoModeEnabled() bool {
+	return c.AutoModeConfig != nil && IsEnabled(c.AutoModeConfig.Enabled)
+}
+
 // ClusterProvider is the interface to AWS APIs
 type ClusterProvider interface {
 	CloudFormation() awsapi.CloudFormation
@@ -889,6 +994,13 @@ type ClusterConfig struct {
 
 	// +optional
 	KubernetesNetworkConfig *KubernetesNetworkConfig `json:"kubernetesNetworkConfig,omitempty"`
+
+	// AutoModeConfig holds the config for Auto Mode.
+	// +optional
+	AutoModeConfig *AutoModeConfig `json:"autoModeConfig,omitempty"`
+
+	// +optional
+	RemoteNetworkConfig *RemoteNetworkConfig `json:"remoteNetworkConfig,omitempty"`
 
 	// +optional
 	IAM *ClusterIAM `json:"iam,omitempty"`
@@ -1107,13 +1219,18 @@ func (c *ClusterConfig) IPv6Enabled() bool {
 
 // SetClusterState updates the cluster state and populates the ClusterStatus using *eks.Cluster.
 func (c *ClusterConfig) SetClusterState(cluster *ekstypes.Cluster) error {
-	if networkConfig := cluster.KubernetesNetworkConfig; networkConfig != nil && networkConfig.ServiceIpv4Cidr != nil {
-		c.Status.KubernetesNetworkConfig = &KubernetesNetworkConfig{
-			ServiceIPv4CIDR: *networkConfig.ServiceIpv4Cidr,
+	if networkConfig := cluster.KubernetesNetworkConfig; networkConfig != nil {
+		knc := &KubernetesNetworkConfig{}
+		if networkConfig.ServiceIpv4Cidr != nil {
+			knc.IPFamily = IPV4Family
+			knc.ServiceIPv4CIDR = aws.ToString(networkConfig.ServiceIpv4Cidr)
 		}
-		c.KubernetesNetworkConfig = &KubernetesNetworkConfig{
-			ServiceIPv4CIDR: aws.ToString(cluster.KubernetesNetworkConfig.ServiceIpv4Cidr),
+		if networkConfig.ServiceIpv6Cidr != nil {
+			knc.IPFamily = IPV6Family
+			knc.ServiceIPv6CIDR = aws.ToString(networkConfig.ServiceIpv6Cidr)
 		}
+		c.KubernetesNetworkConfig = knc
+		c.Status.KubernetesNetworkConfig = knc
 	}
 	data, err := base64.StdEncoding.DecodeString(*cluster.CertificateAuthority.Data)
 	if err != nil {
@@ -1508,6 +1625,13 @@ type (
 		// +optional
 		MaxUnavailablePercentage *int `json:"maxUnavailablePercentage,omitempty"`
 	}
+
+	// NodeGroupNodeRepairConfig contains the auto repair configuration for the nodegroup
+	NodeGroupNodeRepairConfig struct {
+		// Enables the auto repair feature for the nodegroup
+		// +optional
+		Enabled *bool `json:"enabled,omitempty"`
+	}
 )
 
 // MetricsCollection used by the scaling config,
@@ -1794,6 +1918,10 @@ type ManagedNodeGroup struct {
 
 	// ReleaseVersion the AMI version of the EKS optimized AMI to use
 	ReleaseVersion string `json:"releaseVersion"`
+
+	// NodeRepairConfig configures the auto repair feature of the nodegroup
+	// +optional
+	NodeRepairConfig *NodeGroupNodeRepairConfig `json:"nodeRepairConfig,omitempty"`
 
 	// Internal fields
 

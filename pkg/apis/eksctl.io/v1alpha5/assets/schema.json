@@ -285,6 +285,34 @@
       "description": "holds the addons config.",
       "x-intellij-html-description": "holds the addons config."
     },
+    "AutoModeConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "enables or disables Auto Mode.",
+          "x-intellij-html-description": "enables or disables Auto Mode."
+        },
+        "nodePools": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "a list of node pools to create.",
+          "x-intellij-html-description": "a list of node pools to create."
+        },
+        "nodeRoleARN": {
+          "$ref": "#/definitions/ARN",
+          "description": "node role to use for nodes launched by Auto Mode.",
+          "x-intellij-html-description": "node role to use for nodes launched by Auto Mode."
+        }
+      },
+      "preferredOrder": [
+        "enabled",
+        "nodeRoleARN",
+        "nodePools"
+      ],
+      "additionalProperties": false
+    },
     "CapacityReservation": {
       "properties": {
         "capacityReservationPreference": {
@@ -396,6 +424,11 @@
             "eksctl.io/v1alpha5"
           ]
         },
+        "autoModeConfig": {
+          "$ref": "#/definitions/AutoModeConfig",
+          "description": "holds the config for Auto Mode.",
+          "x-intellij-html-description": "holds the config for Auto Mode."
+        },
         "availabilityZones": {
           "items": {
             "type": "string"
@@ -484,11 +517,19 @@
           "description": "allows configuring a fully-private cluster in which no node has outbound internet access, and private access to AWS services is enabled via VPC endpoints",
           "x-intellij-html-description": "allows configuring a fully-private cluster in which no node has outbound internet access, and private access to AWS services is enabled via VPC endpoints"
         },
+        "remoteNetworkConfig": {
+          "$ref": "#/definitions/RemoteNetworkConfig"
+        },
         "secretsEncryption": {
           "$ref": "#/definitions/SecretsEncryption"
         },
         "vpc": {
           "$ref": "#/definitions/ClusterVPC"
+        },
+        "zonalShiftConfig": {
+          "$ref": "#/definitions/ZonalShiftConfig",
+          "description": "specifies the zonal shift configuration.",
+          "x-intellij-html-description": "specifies the zonal shift configuration."
         }
       },
       "preferredOrder": [
@@ -496,6 +537,8 @@
         "apiVersion",
         "metadata",
         "kubernetesNetworkConfig",
+        "autoModeConfig",
+        "remoteNetworkConfig",
         "iam",
         "iamIdentityMappings",
         "identityProviders",
@@ -513,7 +556,8 @@
         "secretsEncryption",
         "gitops",
         "karpenter",
-        "outpost"
+        "outpost",
+        "zonalShiftConfig"
       ],
       "additionalProperties": false,
       "description": "a simple config, to be replaced with Cluster API",
@@ -1249,13 +1293,19 @@
         },
         "serviceIPv4CIDR": {
           "type": "string",
-          "description": "CIDR range from where `ClusterIP`s are assigned",
-          "x-intellij-html-description": "CIDR range from where <code>ClusterIP</code>s are assigned"
+          "description": "IPv4 CIDR range from where `ClusterIP`s are assigned",
+          "x-intellij-html-description": "IPv4 CIDR range from where <code>ClusterIP</code>s are assigned"
+        },
+        "serviceIPv6CIDR": {
+          "type": "string",
+          "description": "IPv6 CIDR range from where `ClusterIP`s are assigned",
+          "x-intellij-html-description": "IPv6 CIDR range from where <code>ClusterIP</code>s are assigned"
         }
       },
       "preferredOrder": [
         "ipFamily",
-        "serviceIPv4CIDR"
+        "serviceIPv4CIDR",
+        "serviceIPv6CIDR"
       ],
       "additionalProperties": false,
       "description": "contains cluster networking options",
@@ -1303,12 +1353,14 @@
         },
         "amiFamily": {
           "type": "string",
-          "description": "Valid variants are: `\"AmazonLinux2\"` (default), `\"AmazonLinux2023\"`, `\"UbuntuPro2204\"`, `\"Ubuntu2204\"`, `\"Ubuntu2004\"`, `\"Ubuntu1804\"`, `\"Bottlerocket\"`, `\"WindowsServer2019CoreContainer\"`, `\"WindowsServer2019FullContainer\"`, `\"WindowsServer2022CoreContainer\"`, `\"WindowsServer2022FullContainer\"`.",
-          "x-intellij-html-description": "Valid variants are: <code>&quot;AmazonLinux2&quot;</code> (default), <code>&quot;AmazonLinux2023&quot;</code>, <code>&quot;UbuntuPro2204&quot;</code>, <code>&quot;Ubuntu2204&quot;</code>, <code>&quot;Ubuntu2004&quot;</code>, <code>&quot;Ubuntu1804&quot;</code>, <code>&quot;Bottlerocket&quot;</code>, <code>&quot;WindowsServer2019CoreContainer&quot;</code>, <code>&quot;WindowsServer2019FullContainer&quot;</code>, <code>&quot;WindowsServer2022CoreContainer&quot;</code>, <code>&quot;WindowsServer2022FullContainer&quot;</code>.",
+          "description": "Valid variants are: `\"AmazonLinux2\"` (default), `\"AmazonLinux2023\"`, `\"UbuntuPro2404\"`, `\"Ubuntu2404\"`, `\"UbuntuPro2204\"`, `\"Ubuntu2204\"`, `\"Ubuntu2004\"`, `\"Ubuntu1804\"`, `\"Bottlerocket\"`, `\"WindowsServer2019CoreContainer\"`, `\"WindowsServer2019FullContainer\"`, `\"WindowsServer2022CoreContainer\"`, `\"WindowsServer2022FullContainer\"`.",
+          "x-intellij-html-description": "Valid variants are: <code>&quot;AmazonLinux2&quot;</code> (default), <code>&quot;AmazonLinux2023&quot;</code>, <code>&quot;UbuntuPro2404&quot;</code>, <code>&quot;Ubuntu2404&quot;</code>, <code>&quot;UbuntuPro2204&quot;</code>, <code>&quot;Ubuntu2204&quot;</code>, <code>&quot;Ubuntu2004&quot;</code>, <code>&quot;Ubuntu1804&quot;</code>, <code>&quot;Bottlerocket&quot;</code>, <code>&quot;WindowsServer2019CoreContainer&quot;</code>, <code>&quot;WindowsServer2019FullContainer&quot;</code>, <code>&quot;WindowsServer2022CoreContainer&quot;</code>, <code>&quot;WindowsServer2022FullContainer&quot;</code>.",
           "default": "AmazonLinux2",
           "enum": [
             "AmazonLinux2",
             "AmazonLinux2023",
+            "UbuntuPro2404",
+            "Ubuntu2404",
             "UbuntuPro2204",
             "Ubuntu2204",
             "Ubuntu2004",
@@ -1424,6 +1476,11 @@
         },
         "name": {
           "type": "string"
+        },
+        "nodeRepairConfig": {
+          "$ref": "#/definitions/NodeGroupNodeRepairConfig",
+          "description": "configures the auto repair feature of the nodegroup",
+          "x-intellij-html-description": "configures the auto repair feature of the nodegroup"
         },
         "outpostARN": {
           "type": "string",
@@ -1589,7 +1646,8 @@
         "taints",
         "updateConfig",
         "launchTemplate",
-        "releaseVersion"
+        "releaseVersion",
+        "nodeRepairConfig"
       ],
       "additionalProperties": false,
       "description": "represents an EKS-managed nodegroup",
@@ -1638,12 +1696,14 @@
         },
         "amiFamily": {
           "type": "string",
-          "description": "Valid variants are: `\"AmazonLinux2\"` (default), `\"AmazonLinux2023\"`, `\"UbuntuPro2204\"`, `\"Ubuntu2204\"`, `\"Ubuntu2004\"`, `\"Ubuntu1804\"`, `\"Bottlerocket\"`, `\"WindowsServer2019CoreContainer\"`, `\"WindowsServer2019FullContainer\"`, `\"WindowsServer2022CoreContainer\"`, `\"WindowsServer2022FullContainer\"`.",
-          "x-intellij-html-description": "Valid variants are: <code>&quot;AmazonLinux2&quot;</code> (default), <code>&quot;AmazonLinux2023&quot;</code>, <code>&quot;UbuntuPro2204&quot;</code>, <code>&quot;Ubuntu2204&quot;</code>, <code>&quot;Ubuntu2004&quot;</code>, <code>&quot;Ubuntu1804&quot;</code>, <code>&quot;Bottlerocket&quot;</code>, <code>&quot;WindowsServer2019CoreContainer&quot;</code>, <code>&quot;WindowsServer2019FullContainer&quot;</code>, <code>&quot;WindowsServer2022CoreContainer&quot;</code>, <code>&quot;WindowsServer2022FullContainer&quot;</code>.",
+          "description": "Valid variants are: `\"AmazonLinux2\"` (default), `\"AmazonLinux2023\"`, `\"UbuntuPro2404\"`, `\"Ubuntu2404\"`, `\"UbuntuPro2204\"`, `\"Ubuntu2204\"`, `\"Ubuntu2004\"`, `\"Ubuntu1804\"`, `\"Bottlerocket\"`, `\"WindowsServer2019CoreContainer\"`, `\"WindowsServer2019FullContainer\"`, `\"WindowsServer2022CoreContainer\"`, `\"WindowsServer2022FullContainer\"`.",
+          "x-intellij-html-description": "Valid variants are: <code>&quot;AmazonLinux2&quot;</code> (default), <code>&quot;AmazonLinux2023&quot;</code>, <code>&quot;UbuntuPro2404&quot;</code>, <code>&quot;Ubuntu2404&quot;</code>, <code>&quot;UbuntuPro2204&quot;</code>, <code>&quot;Ubuntu2204&quot;</code>, <code>&quot;Ubuntu2004&quot;</code>, <code>&quot;Ubuntu1804&quot;</code>, <code>&quot;Bottlerocket&quot;</code>, <code>&quot;WindowsServer2019CoreContainer&quot;</code>, <code>&quot;WindowsServer2019FullContainer&quot;</code>, <code>&quot;WindowsServer2022CoreContainer&quot;</code>, <code>&quot;WindowsServer2022FullContainer&quot;</code>.",
           "default": "AmazonLinux2",
           "enum": [
             "AmazonLinux2",
             "AmazonLinux2023",
+            "UbuntuPro2404",
+            "Ubuntu2404",
             "UbuntuPro2204",
             "Ubuntu2204",
             "Ubuntu2004",
@@ -2161,6 +2221,21 @@
       "description": "holds the configuration for [spot instances](/usage/spot-instances/)",
       "x-intellij-html-description": "holds the configuration for <a href=\"/usage/spot-instances/\">spot instances</a>"
     },
+    "NodeGroupNodeRepairConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enables the auto repair feature for the nodegroup",
+          "x-intellij-html-description": "Enables the auto repair feature for the nodegroup"
+        }
+      },
+      "preferredOrder": [
+        "enabled"
+      ],
+      "additionalProperties": false,
+      "description": "contains the auto repair configuration for the nodegroup",
+      "x-intellij-html-description": "contains the auto repair configuration for the nodegroup"
+    },
     "NodeGroupSGs": {
       "properties": {
         "attachIDs": {
@@ -2466,6 +2541,82 @@
       "description": "defines the configuration for a fully-private cluster.",
       "x-intellij-html-description": "defines the configuration for a fully-private cluster."
     },
+    "RemoteNetwork": {
+      "properties": {
+        "cidrs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "preferredOrder": [
+        "cidrs"
+      ],
+      "additionalProperties": false,
+      "description": "RemoteNetwork",
+      "x-intellij-html-description": "RemoteNetwork"
+    },
+    "RemoteNetworkConfig": {
+      "required": [
+        "vpcGatewayID",
+        "remoteNodeNetworks"
+      ],
+      "properties": {
+        "iam": {
+          "$ref": "#/definitions/RemoteNodesIAM"
+        },
+        "remoteNodeNetworks": {
+          "items": {
+            "$ref": "#/definitions/RemoteNetwork"
+          },
+          "type": "array"
+        },
+        "remotePodNetworks": {
+          "items": {
+            "$ref": "#/definitions/RemoteNetwork"
+          },
+          "type": "array"
+        },
+        "vpcGatewayID": {
+          "$ref": "#/definitions/VPCGateway"
+        }
+      },
+      "preferredOrder": [
+        "iam",
+        "vpcGatewayID",
+        "remoteNodeNetworks",
+        "remotePodNetworks"
+      ],
+      "additionalProperties": false,
+      "description": "RemoteNetworkConfig",
+      "x-intellij-html-description": "RemoteNetworkConfig"
+    },
+    "RemoteNodesIAM": {
+      "properties": {
+        "caBundleCert": {
+          "type": "string",
+          "description": "the CA bundle certificate used by IRA trust anchor. Can't be set if Provider is SSM.",
+          "x-intellij-html-description": "the CA bundle certificate used by IRA trust anchor. Can't be set if Provider is SSM."
+        },
+        "provider": {
+          "type": "string",
+          "description": "the AWS service responsible for provisioning IAM credentials to remote nodes. Valid options are `SSM` (System Manager), default, and `IRA` (IAM Roles anywhere). Required IRA config (i.e. TrustAnchor, AnywhereProfile) will be created by eksctl behind the scenes.",
+          "x-intellij-html-description": "the AWS service responsible for provisioning IAM credentials to remote nodes. Valid options are <code>SSM</code> (System Manager), default, and <code>IRA</code> (IAM Roles anywhere). Required IRA config (i.e. TrustAnchor, AnywhereProfile) will be created by eksctl behind the scenes."
+        },
+        "roleARN": {
+          "type": "string",
+          "description": "the IAM Role ARN to be added to aws-auth configmap for remote nodes. If not set, eksctl creates the role behind the scenes, adds an entry into the configmap and sets up any other SSM/IRA config. If set, eksctl will only add the configmap entry, while creating any required SSM/IRA config falls under user's responsibility.",
+          "x-intellij-html-description": "the IAM Role ARN to be added to aws-auth configmap for remote nodes. If not set, eksctl creates the role behind the scenes, adds an entry into the configmap and sets up any other SSM/IRA config. If set, eksctl will only add the configmap entry, while creating any required SSM/IRA config falls under user's responsibility."
+        }
+      },
+      "preferredOrder": [
+        "provider",
+        "roleARN",
+        "caBundleCert"
+      ],
+      "additionalProperties": false
+    },
     "SecretsEncryption": {
       "required": [
         "keyARN"
@@ -2481,6 +2632,11 @@
       "additionalProperties": false,
       "description": "defines the configuration for KMS encryption provider",
       "x-intellij-html-description": "defines the configuration for KMS encryption provider"
+    },
+    "VPCGateway": {
+      "type": "string",
+      "description": "VPCGatewayID the ID of the gateway that facilitates external connectivity from customer's VPC to their remote network(s). Valid options are Transit Gateway and Virtual Private Gateway.",
+      "x-intellij-html-description": "VPCGatewayID the ID of the gateway that facilitates external connectivity from customer's VPC to their remote network(s). Valid options are Transit Gateway and Virtual Private Gateway."
     },
     "VolumeMapping": {
       "properties": {
@@ -2593,6 +2749,21 @@
       "additionalProperties": false,
       "description": "for attaching common IAM policies",
       "x-intellij-html-description": "for attaching common IAM policies"
+    },
+    "ZonalShiftConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "enables or disables zonal shift.",
+          "x-intellij-html-description": "enables or disables zonal shift."
+        }
+      },
+      "preferredOrder": [
+        "enabled"
+      ],
+      "additionalProperties": false,
+      "description": "holds the zonal shift configuration.",
+      "x-intellij-html-description": "holds the zonal shift configuration."
     },
     "github.com|aws|aws-sdk-go-v2|aws|arn.ARN": {
       "description": "captures the individual fields of an Amazon Resource Name. See http://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html for more information.",

@@ -261,6 +261,8 @@ type EKS interface {
 	//
 	// [Creating or updating a kubeconfig file for an Amazon EKS cluster]: https://docs.aws.amazon.com/eks/latest/userguide/create-kubeconfig.html
 	DescribeCluster(ctx context.Context, params *DescribeClusterInput, optFns ...func(*Options)) (*DescribeClusterOutput, error)
+	// Lists available Kubernetes versions for Amazon EKS clusters.
+	DescribeClusterVersions(ctx context.Context, params *DescribeClusterVersionsInput, optFns ...func(*Options)) (*DescribeClusterVersionsOutput, error)
 	// Returns descriptive information about a subscription.
 	DescribeEksAnywhereSubscription(ctx context.Context, params *DescribeEksAnywhereSubscriptionInput, optFns ...func(*Options)) (*DescribeEksAnywhereSubscriptionOutput, error)
 	// Describes an Fargate profile.
@@ -382,6 +384,10 @@ type EKS interface {
 	// the subnets must be in the same VPC as the subnets that the cluster was created
 	// with. For more information about the VPC requirements, see [https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html]in the Amazon EKS
 	// User Guide .
+	//
+	// You can also use this API operation to enable or disable ARC zonal shift. If
+	// zonal shift is enabled, Amazon Web Services configures zonal autoshift for the
+	// cluster.
 	//
 	// Cluster updates are asynchronous, and they should finish within a few minutes.
 	// During an update, the cluster status moves to UPDATING (this status transition
